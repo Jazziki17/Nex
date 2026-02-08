@@ -1,0 +1,86 @@
+# ============================================================
+# pyproject.toml — The Modern Python Project Configuration
+# ============================================================
+#
+# LEARNING POINT: pyproject.toml
+# --------------------------------
+# This file replaces the old setup.py and setup.cfg. It's the
+# single source of truth for your project's:
+#   - Metadata (name, version, author)
+#   - Dependencies (what packages you need)
+#   - Tool configuration (pytest, linting, etc.)
+#
+# PEP 621 defines the standard format. All modern Python tools
+# read from this file.
+# ============================================================
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "kai"
+version = "0.1.0"
+description = "Personal AI Assistant with voice, speech, and motion recognition"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+
+# Core dependencies — the minimum needed to run Kai
+dependencies = []
+
+# Optional dependencies — install only what you need
+[project.optional-dependencies]
+# Voice & Speech
+voice = [
+    "pyaudio>=0.2.14",
+    "openai-whisper>=20231117",
+]
+tts = [
+    "piper-tts>=1.2.0",
+]
+
+# Computer Vision
+vision = [
+    "opencv-python>=4.9.0",
+    "mediapipe>=0.10.9",
+]
+
+# All features
+all = [
+    "kai[voice,tts,vision]",
+    "pyyaml>=6.0",
+]
+
+# Development tools
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "ruff>=0.2.0",
+]
+
+# ─── Tool Configuration ─────────────────────────────────────
+
+[tool.pytest.ini_options]
+# LEARNING POINT: pytest configuration
+# Instead of a separate pytest.ini file, configure pytest here.
+testpaths = ["tests"]
+asyncio_mode = "auto"              # Auto-detect async tests
+addopts = "-v --tb=short"          # Verbose output, short tracebacks
+
+[tool.ruff]
+# LEARNING POINT: Linting
+# Ruff is an extremely fast Python linter. It catches style issues,
+# potential bugs, and enforces coding standards automatically.
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort (import sorting)
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+]

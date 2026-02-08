@@ -1,0 +1,40 @@
+# ============================================================
+# Kai Configuration File
+# ============================================================
+# This file contains the default settings for Kai.
+# Modify values here to customize behavior.
+# Environment variables (KAI_*) override these settings.
+# ============================================================
+
+kai:
+  name: "Kai"
+  version: "0.1.0"
+
+# --- Voice Recognition ---
+voice:
+  enabled: true
+  wake_words:
+    - "hey kai"
+    - "kai"
+  sample_rate: 16000        # Hz — 16000 is standard for speech
+  silence_threshold: 500    # Amplitude below this = silence
+
+# --- Speech Processing ---
+speech:
+  enabled: true
+  model_size: "base"        # Options: tiny, base, small, medium, large
+  language: "en"            # ISO language code
+  tts_voice: "Samantha"     # macOS voice name
+
+# --- Computer Vision ---
+vision:
+  enabled: true
+  camera_id: 0              # 0 = default camera
+  fps: 15                   # Frames per second to process
+  resolution: [640, 480]    # Width x Height
+  motion_threshold: 25      # Pixel difference to count as motion (0-255)
+
+# --- Local I/O ---
+io:
+  data_dir: "~/.kai/data"
+  max_log_size_mb: 50
