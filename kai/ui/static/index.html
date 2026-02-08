@@ -101,27 +101,19 @@
                 </div>
             </section>
 
-            <!-- Center — Main display -->
+            <!-- Center — Node Matrix Display -->
             <section class="panel panel--center">
-                <div class="center-display">
-                    <!-- Kai core visualizer -->
-                    <div class="core-orb" id="core-orb">
-                        <div class="core-orb__ring core-orb__ring--outer"></div>
-                        <div class="core-orb__ring core-orb__ring--middle"></div>
-                        <div class="core-orb__ring core-orb__ring--inner"></div>
-                        <div class="core-orb__center">
-                            <span>KAI</span>
-                        </div>
-                    </div>
+                <div class="center-display" id="center-display">
+                    <!-- Matrix canvas is injected here by matrix.js -->
+                </div>
 
-                    <!-- Command input -->
+                <!-- Command bar (overlaid at bottom of center) -->
+                <div class="center-overlay">
                     <div class="command-input">
                         <div class="command-input__prefix">▸</div>
                         <input type="text" id="command-field" placeholder="Speak or type a command..." autocomplete="off" spellcheck="false">
                         <div class="command-input__suffix" id="send-btn">⏎</div>
                     </div>
-
-                    <!-- Response area -->
                     <div class="response-area" id="response-area">
                         <div class="response-line response-line--system">
                             <span class="response-prefix">[KAI]</span>
@@ -182,6 +174,7 @@
 
     <script src="js/particles.js"></script>
     <script src="js/thoughts.js"></script>
+    <script src="js/matrix.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

@@ -399,19 +399,43 @@ html, body {
 
 /* ─── Center Panel ────────────────────────────────────────── */
 .panel--center {
-    border: none;
-    background: transparent;
-    backdrop-filter: none;
-    box-shadow: none;
+    position: relative;
+    background: rgba(5, 8, 15, 0.7);
+    overflow: hidden;
 }
 
 .center-display {
+    position: relative;
+    width: 100%;
     height: 100%;
+}
+
+#matrix-canvas {
+    display: block;
+}
+
+.center-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 30px;
+    gap: 8px;
+    background: linear-gradient(0deg, rgba(5, 8, 15, 0.95) 0%, rgba(5, 8, 15, 0.6) 70%, transparent 100%);
+    pointer-events: auto;
+    z-index: 20;
+}
+
+.center-overlay .command-input {
+    max-width: 100%;
+}
+
+.center-overlay .response-area {
+    max-width: 100%;
+    max-height: 120px;
+    background: rgba(10, 15, 30, 0.6);
 }
 
 /* ─── Core Orb ────────────────────────────────────────────── */

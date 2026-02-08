@@ -229,6 +229,12 @@ function processCommand(text) {
         }
     }, 300 + Math.random() * 500);
 
+    // Trigger matrix reaction
+    if (typeof matrix !== 'undefined' && matrix) {
+        matrix.onCommand(text);
+        matrix.onVoiceInput(0.8);
+    }
+
     // Add thought
     addNewThought(text);
 
@@ -292,20 +298,21 @@ document.querySelectorAll('.module-card').forEach(card => {
             'system',
             '[KAI]'
         );
+
+        // Trigger matrix reaction for the clicked module
+        if (typeof matrix !== 'undefined' && matrix) {
+            const moduleNodeMap = { voice: 2, speech: 3, vision: 7, io: 11 };
+            const nodeId = moduleNodeMap[mod];
+            if (nodeId !== undefined) {
+                const node = matrix.nodes[nodeId];
+                node.energy = 1.0;
+                matrix.triggerPulse(node.x, node.y, node.color);
+            }
+        }
     });
 });
 
-// ─── Core Orb Mouse Interaction ─────────────────────────────
-const coreOrb = document.getElementById('core-orb');
-document.addEventListener('mousemove', (e) => {
-    const rect = coreOrb.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dx = (e.clientX - cx) * 0.02;
-    const dy = (e.clientY - cy) * 0.02;
-
-    coreOrb.style.transform = `translate(${dx}px, ${dy}px)`;
-});
+// ─── Core Orb reference removed — replaced by Node Matrix ──
 
 // ─── Startup Animation ─────────────────────────────────────
 const startupMessages = [
