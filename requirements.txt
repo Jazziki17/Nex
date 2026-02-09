@@ -24,6 +24,17 @@ pytest-cov>=4.1
 # --- Configuration ---
 pyyaml>=6.0
 
+# --- API Server ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+websockets>=13.0
+
+# --- Spreadsheet Support ---
+openpyxl>=3.1.0
+
+# --- Network Discovery ---
+zeroconf>=0.131.0
+
 # --- Optional: Voice & Speech ---
 # Uncomment when ready to use real audio:
 # pyaudio>=0.2.14

@@ -301,21 +301,94 @@
         initParticles();
     }
 
-    // ─── Voice Simulation ───────────────────────────────
-    // Simulates voice input. Replace with real mic data via
-    // Web Audio API for production.
+    // ─── WebSocket Connection ────────────────────────────
+    // Connects to the Kai API server for real-time events.
+    // Falls back to simulation if server is unavailable.
 
     let voiceInterval = null;
     let isSpeaking = false;
+    let ws = null;
+    let wsConnected = false;
+    let wsReconnectTimer = null;
 
-    function simulateVoice() {
-        // Random bursts of "speech"
-        setInterval(() => {
-            if (Math.random() < 0.25) {
+    function connectWebSocket() {
+        const wsUrl = `ws://${location.hostname || 'localhost'}:${location.port || 8420}/ws`;
+
+        try {
+            ws = new WebSocket(wsUrl);
+        } catch {
+            fallbackToSimulation();
+            return;
+        }
+
+        ws.onopen = () => {
+            wsConnected = true;
+            statusEl.textContent = 'CONNECTED';
+            statusEl.classList.add('active');
+            setTimeout(() => {
+                statusEl.classList.remove('active');
+                statusEl.textContent = 'LISTENING';
+            }, 1500);
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                handleServerEvent(msg);
+            } catch {}
+        };
+
+        ws.onclose = () => {
+            wsConnected = false;
+            statusEl.textContent = 'RECONNECTING';
+            wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = () => {
+            ws.close();
+        };
+    }
+
+    function handleServerEvent(msg) {
+        const { type, data } = msg;
+
+        switch (type) {
+            case 'voice.amplitude':
+                targetAmp = Math.min(1, Math.max(0, data.amplitude || 0));
+                break;
+
+            case 'voice.detected':
                 startSpeaking();
-                setTimeout(stopSpeaking, 1500 + Math.random() * 3000);
-            }
-        }, 4000);
+                break;
+
+            case 'speech.recognized':
+                showTranscript(data.text || 'Speech recognized.');
+                break;
+
+            case 'speech.respond':
+                showTranscript(data.text || '');
+                stopSpeaking();
+                break;
+
+            case 'system.ready':
+                showTranscript('Kai is ready.');
+                break;
+
+            case 'system.module_error':
+                showTranscript('Module error: ' + (data.module || 'unknown'));
+                break;
+
+            case 'connected':
+                // Welcome message from server
+                break;
+
+            default:
+                // Other events pulse the orb gently
+                if (targetAmp < 0.1) {
+                    targetAmp = 0.2;
+                    setTimeout(() => { targetAmp = 0; }, 400);
+                }
+        }
     }
 
     function startSpeaking() {
@@ -334,29 +407,35 @@
         targetAmp = 0;
         statusEl.classList.remove('active');
         statusEl.textContent = 'LISTENING';
-
-        // Show simulated transcript
-        showTranscript();
     }
 
-    const transcripts = [
-        'Initializing neural pathways...',
-        'Voice pattern recognized.',
-        'Processing ambient data.',
-        'System calibration complete.',
-        'Ready for next command.',
-        'Audio signature confirmed.',
-        'Analyzing input stream...',
-    ];
-
-    function showTranscript() {
-        const text = transcripts[Math.floor(Math.random() * transcripts.length)];
+    function showTranscript(text) {
         transcriptEl.textContent = text;
         transcriptEl.classList.add('visible');
 
         setTimeout(() => {
             transcriptEl.classList.remove('visible');
         }, 3000);
+    }
+
+    // Fallback: simulate voice if no WebSocket server available
+    function fallbackToSimulation() {
+        setInterval(() => {
+            if (Math.random() < 0.25) {
+                startSpeaking();
+                setTimeout(() => {
+                    stopSpeaking();
+                    const msgs = [
+                        'Initializing neural pathways...',
+                        'Voice pattern recognized.',
+                        'Processing ambient data.',
+                        'System calibration complete.',
+                        'Ready for next command.',
+                    ];
+                    showTranscript(msgs[Math.floor(Math.random() * msgs.length)]);
+                }, 1500 + Math.random() * 3000);
+            }
+        }, 4000);
     }
 
     // ─── Command Input ──────────────────────────────────
@@ -387,15 +466,18 @@
             commandBar.classList.remove('visible');
             commandVisible = false;
 
+            // Send command via WebSocket if connected
+            if (ws && wsConnected) {
+                ws.send(JSON.stringify({ type: 'command', command: text }));
+            }
+
             // Trigger voice reaction
             startSpeaking();
-            transcriptEl.textContent = text;
-            transcriptEl.classList.add('visible');
+            showTranscript(text);
 
             setTimeout(() => {
                 stopSpeaking();
-                transcriptEl.textContent = 'Command processed.';
-                setTimeout(() => transcriptEl.classList.remove('visible'), 2000);
+                showTranscript('Command processed.');
             }, 1500);
         }
     });
@@ -436,7 +518,7 @@
 
     window.addEventListener('resize', resize);
     resize();
-    simulateVoice();
+    connectWebSocket();
     animate();
 
 })();

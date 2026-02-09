@@ -38,3 +38,12 @@ vision:
 io:
   data_dir: "~/.kai/data"
   max_log_size_mb: 50
+
+# --- API Server ---
+api:
+  port: 8420
+  host: "0.0.0.0"
+  allowed_paths:
+    - "~"
+  cors_origins:
+    - "*"
