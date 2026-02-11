@@ -4,23 +4,107 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KAI</title>
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <canvas id="canvas"></canvas>
 
-    <!-- Minimal status text -->
+    <!-- Nav Toggle (top-right) -->
+    <nav class="nav-toggle" id="nav-toggle">
+        <button class="nav-btn active" data-view="orb" title="Orb">
+            <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+        <button class="nav-btn" data-view="dashboard" title="Dashboard">
+            <svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="3" width="7" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="11" width="7" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="14" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+        <button class="nav-btn" data-view="settings" title="Settings">
+            <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+    </nav>
+
+    <!-- Status text -->
     <div class="status" id="status">LISTENING</div>
 
-    <!-- Transcript overlay (appears when speaking) -->
+    <!-- Transcript overlay -->
     <div class="transcript" id="transcript"></div>
 
-    <!-- Hidden command input (activated by clicking or pressing) -->
+    <!-- Command input -->
     <div class="command-bar" id="command-bar">
         <input type="text" id="command-input" placeholder="Type a command..." autocomplete="off" spellcheck="false">
     </div>
 
+    <!-- Dashboard View -->
+    <div class="view-overlay" id="dashboard-view">
+        <div class="dashboard-grid">
+            <div class="stat-card" id="card-cpu">
+                <div class="stat-label">CPU</div>
+                <div class="stat-value" id="stat-cpu">0%</div>
+                <div class="stat-bar"><div class="stat-bar-fill" id="bar-cpu"></div></div>
+                <div class="stat-sub" id="sub-cpu">— cores</div>
+            </div>
+            <div class="stat-card" id="card-memory">
+                <div class="stat-label">MEMORY</div>
+                <div class="stat-value" id="stat-memory">0%</div>
+                <div class="stat-bar"><div class="stat-bar-fill" id="bar-memory"></div></div>
+                <div class="stat-sub" id="sub-memory">— / — GB</div>
+            </div>
+            <div class="stat-card" id="card-disk">
+                <div class="stat-label">DISK</div>
+                <div class="stat-value" id="stat-disk">0%</div>
+                <div class="stat-bar"><div class="stat-bar-fill" id="bar-disk"></div></div>
+                <div class="stat-sub" id="sub-disk">— / — GB</div>
+            </div>
+            <div class="stat-card" id="card-battery">
+                <div class="stat-label">BATTERY</div>
+                <div class="stat-value" id="stat-battery">—</div>
+                <div class="stat-bar"><div class="stat-bar-fill" id="bar-battery"></div></div>
+                <div class="stat-sub" id="sub-battery">—</div>
+            </div>
+            <div class="stat-card wide" id="card-network">
+                <div class="stat-label">NETWORK</div>
+                <div class="stat-value" id="stat-network">— / —</div>
+                <div class="stat-sub" id="sub-network">sent / received</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings View -->
+    <div class="view-overlay" id="settings-view">
+        <div class="settings-panel">
+            <h2 class="settings-title">SETTINGS</h2>
+
+            <div class="settings-group">
+                <label class="settings-label">Voice</label>
+                <div class="settings-row">
+                    <select id="voice-select" class="settings-select">
+                        <option value="">Loading voices...</option>
+                    </select>
+                    <button id="voice-test" class="settings-btn">Test</button>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <label class="settings-label">Memory</label>
+                <div class="settings-row">
+                    <button id="memory-view" class="settings-btn">View Memories</button>
+                    <button id="memory-clear" class="settings-btn danger">Clear All</button>
+                </div>
+                <div id="memory-output" class="memory-output"></div>
+            </div>
+
+            <div class="settings-group">
+                <label class="settings-label">User</label>
+                <div class="settings-row">
+                    <input type="text" id="user-name-input" class="settings-input" placeholder="Your name">
+                    <button id="user-name-save" class="settings-btn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="js/kai-orb.js"></script>
+    <script src="js/kai-dashboard.js"></script>
+    <script src="js/kai-settings.js"></script>
 </body>
 </html>

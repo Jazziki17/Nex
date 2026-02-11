@@ -1,5 +1,5 @@
 /**
- * Tray — macOS menu bar icon with show/hide, status, restart, quit.
+ * Tray — macOS menu bar icon with show/hide, status, restart, launch at login, quit.
  */
 
 import { Tray, Menu, app, nativeImage } from 'electron'
@@ -19,6 +19,8 @@ export function createTray(pythonBridge: PythonBridge): void {
   tray = new Tray(icon)
   tray.setToolTip('Kai AI Assistant')
 
+  const isLoginItem = app.getLoginItemSettings().openAtLogin
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show/Hide Kai',
@@ -31,6 +33,20 @@ export function createTray(pythonBridge: PythonBridge): void {
       label: 'Status',
       sublabel: pythonBridge.isRunning ? 'Running' : 'Stopped',
       enabled: false,
+    },
+    {
+      type: 'separator',
+    },
+    {
+      label: 'Launch at Login',
+      type: 'checkbox',
+      checked: isLoginItem,
+      click: (menuItem) => {
+        app.setLoginItemSettings({
+          openAtLogin: menuItem.checked,
+          openAsHidden: true,
+        })
+      },
     },
     {
       type: 'separator',

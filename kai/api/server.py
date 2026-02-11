@@ -14,6 +14,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from kai.api.routes import commands, files, spreadsheets, status
+from kai.api.routes.settings import router as settings_router
 from kai.api.websocket_handler import router as ws_router
 from kai.core.engine import KaiEngine
 from kai.utils.logger import setup_logger
@@ -63,14 +64,28 @@ async def _start_engine(eng: KaiEngine):
         except Exception as e:
             logger.warning(f"  [SKIP] FileManager: {e}")
 
+        # Start Memory Manager (before CommandHandler so it can use it)
+        from kai.api.memory_manager import MemoryManager
+        memory_mgr = MemoryManager(eng.event_bus)
+        await memory_mgr.start()
+        eng._memory = memory_mgr
+        logger.info("  [OK] MemoryManager")
+
+        # Start System Monitor (background stats polling)
+        from kai.api.system_monitor import SystemMonitor
+        sys_monitor = SystemMonitor(eng.event_bus)
+        await sys_monitor.start()
+        eng._sys_monitor = sys_monitor
+        logger.info("  [OK] SystemMonitor")
+
         # Start the command handler (processes real commands)
         from kai.api.command_handler import CommandHandler
-        handler = CommandHandler(eng.event_bus)
+        handler = CommandHandler(eng.event_bus, memory_manager=memory_mgr)
         await handler.start()
         logger.info("  [OK] CommandHandler")
 
         await eng.event_bus.publish("system.ready", {
-            "modules_loaded": [m.name for m in eng._modules] + ["CommandHandler"],
+            "modules_loaded": [m.name for m in eng._modules] + ["MemoryManager", "SystemMonitor", "CommandHandler"],
         })
         eng._running = True
         logger.info("Kai engine ready.")
@@ -103,6 +118,7 @@ app.include_router(status.router, prefix="/api")
 app.include_router(files.router, prefix="/api/files")
 app.include_router(commands.router, prefix="/api/commands")
 app.include_router(spreadsheets.router, prefix="/api/files")
+app.include_router(settings_router, prefix="/api/settings")
 app.include_router(ws_router)
 
 # Redirect bare paths to trailing slash so StaticFiles serves index.html

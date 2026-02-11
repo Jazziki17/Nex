@@ -46,6 +46,11 @@ def _install_event_bridge(event_bus):
         "system.module_error",
         "command.response",
         "file.read_response",
+        "system.stats",
+        "tool.executing",
+        "tool.completed",
+        "settings.updated",
+        "settings.voice_change",
     ]
 
     for evt in event_types:
