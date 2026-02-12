@@ -51,6 +51,7 @@ def _install_event_bridge(event_bus):
         "tool.completed",
         "settings.updated",
         "settings.voice_change",
+        "mic.transcribed",
     ]
 
     for evt in event_types:

@@ -314,6 +314,13 @@
         window.dispatchEvent(new CustomEvent('nex:' + type, { detail: data }));
 
         switch (type) {
+            case 'mic.transcribed':
+                showTranscript('> ' + (data.text || ''));
+                statusEl.textContent = 'HEARD YOU';
+                targetAmp = 0.5;
+                startSpeaking();
+                break;
+
             case 'command.response':
                 stopSpeaking();
                 showTranscript(data.text || '');

@@ -84,8 +84,22 @@ async def _start_engine(eng: NexEngine):
         await handler.start()
         logger.info("  [OK] CommandHandler")
 
+        # Start MicListener (real microphone → whisper STT → commands)
+        mic = None
+        try:
+            from nex.voice.mic_listener import MicListener
+            mic = MicListener(eng.event_bus)
+            await mic.start()
+            eng._mic_listener = mic
+            logger.info("  [OK] MicListener")
+        except Exception as e:
+            logger.warning(f"  [SKIP] MicListener: {e}")
+
+        loaded = [m.name for m in eng._modules] + ["MemoryManager", "SystemMonitor", "CommandHandler"]
+        if mic:
+            loaded.append("MicListener")
         await eng.event_bus.publish("system.ready", {
-            "modules_loaded": [m.name for m in eng._modules] + ["MemoryManager", "SystemMonitor", "CommandHandler"],
+            "modules_loaded": loaded,
         })
         eng._running = True
         logger.info("Nex engine ready.")
