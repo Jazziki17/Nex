@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   NEX — Neural Interface + Dashboard + Settings
+   NEX — Premium Dark UI
    ═══════════════════════════════════════════ */
 
 * {
@@ -9,13 +9,28 @@
 }
 
 body {
-    background: #0a0a0f;
+    background: #000;
     overflow: hidden;
     width: 100vw;
     height: 100vh;
     cursor: default;
-    font-family: 'Rajdhani', sans-serif;
+    font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle noise texture overlay */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.015;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    z-index: 9999;
 }
 
 #canvas {
@@ -31,18 +46,25 @@ body {
     opacity: 0.15;
 }
 
-/* ─── Nav Toggle ─────────────────────────── */
+/* ─── Nav Toggle (bottom-center pill) ───── */
 
 .nav-toggle {
     position: fixed;
-    top: 16px;
-    right: 16px;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
-    gap: 4px;
+    gap: 2px;
     z-index: 100;
     opacity: 0;
     transition: opacity 0.3s ease;
     -webkit-app-region: no-drag;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 4px;
 }
 
 .nav-toggle:hover,
@@ -59,12 +81,12 @@ body:hover .nav-toggle:hover {
 }
 
 .nav-btn {
-    width: 32px;
-    height: 32px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(100, 180, 255, 0.1);
-    border-radius: 6px;
-    color: rgba(140, 170, 210, 0.5);
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: none;
+    border-radius: 16px;
+    color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -73,15 +95,13 @@ body:hover .nav-toggle:hover {
 }
 
 .nav-btn:hover {
-    background: rgba(100, 180, 255, 0.08);
-    color: rgba(140, 190, 240, 0.8);
-    border-color: rgba(100, 180, 255, 0.25);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .nav-btn.active {
-    background: rgba(100, 180, 255, 0.12);
-    color: rgba(140, 200, 255, 0.9);
-    border-color: rgba(100, 180, 255, 0.35);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* ─── Status ─────────────────────────────── */
@@ -91,10 +111,10 @@ body:hover .nav-toggle:hover {
     bottom: 12%;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 12px;
-    font-weight: 300;
-    letter-spacing: 6px;
-    color: rgba(140, 160, 190, 0.4);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    color: rgba(255, 255, 255, 0.3);
     text-transform: uppercase;
     pointer-events: none;
     transition: all 0.6s ease;
@@ -102,8 +122,8 @@ body:hover .nav-toggle:hover {
 }
 
 .status.active {
-    color: rgba(100, 200, 255, 0.7);
-    letter-spacing: 8px;
+    color: rgba(255, 255, 255, 0.8);
+    letter-spacing: 6px;
 }
 
 .status.tool-active {
@@ -123,19 +143,20 @@ body:hover .nav-toggle:hover {
     bottom: 7%;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 300;
-    color: rgba(180, 200, 220, 0.7);
+    color: rgba(255, 255, 255, 0.6);
     text-align: center;
-    max-width: 70%;
+    max-width: 80%;
     max-height: 40vh;
     overflow-y: auto;
     white-space: pre-wrap;
-    line-height: 1.5;
+    line-height: 1.6;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.5s ease;
     z-index: 10;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
 .transcript.visible {
@@ -161,27 +182,31 @@ body:hover .nav-toggle:hover {
 }
 
 .command-bar input {
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid rgba(100, 200, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
     outline: none;
-    color: rgba(180, 200, 220, 0.7);
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 15px;
-    font-weight: 300;
-    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
     text-align: center;
-    width: 300px;
-    padding: 8px 0;
-    caret-color: rgba(100, 200, 255, 0.5);
+    width: 400px;
+    padding: 12px 24px;
+    caret-color: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .command-bar input::placeholder {
-    color: rgba(100, 130, 160, 0.3);
+    color: rgba(255, 255, 255, 0.2);
 }
 
 .command-bar input:focus {
-    border-bottom-color: rgba(100, 200, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 /* ─── View Overlays ──────────────────────── */
@@ -220,16 +245,14 @@ body:hover .nav-toggle:hover {
 
 .stat-card {
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(100, 180, 255, 0.08);
-    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
     padding: 20px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     transition: border-color 0.3s ease;
 }
 
 .stat-card:hover {
-    border-color: rgba(100, 180, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .stat-card.wide {
@@ -240,14 +263,15 @@ body:hover .nav-toggle:hover {
     font-size: 10px;
     font-weight: 500;
     letter-spacing: 3px;
-    color: rgba(140, 170, 210, 0.4);
+    color: rgba(255, 255, 255, 0.4);
     margin-bottom: 8px;
+    text-transform: uppercase;
 }
 
 .stat-value {
     font-size: 28px;
     font-weight: 600;
-    color: rgba(180, 210, 240, 0.85);
+    color: rgba(255, 255, 255, 0.85);
     margin-bottom: 10px;
 }
 
@@ -265,7 +289,7 @@ body:hover .nav-toggle:hover {
     width: 0%;
     border-radius: 2px;
     transition: width 0.6s ease, background 0.6s ease;
-    background: linear-gradient(90deg, rgba(80, 160, 255, 0.6), rgba(100, 200, 255, 0.8));
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.7));
 }
 
 .stat-bar-fill.warn {
@@ -279,7 +303,7 @@ body:hover .nav-toggle:hover {
 .stat-sub {
     font-size: 11px;
     font-weight: 300;
-    color: rgba(140, 170, 200, 0.35);
+    color: rgba(255, 255, 255, 0.3);
     letter-spacing: 1px;
 }
 
@@ -290,17 +314,15 @@ body:hover .nav-toggle:hover {
     margin: 0 auto;
     padding: 30px;
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(100, 180, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 16px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
 }
 
 .settings-title {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     letter-spacing: 6px;
-    color: rgba(140, 170, 210, 0.5);
+    color: rgba(255, 255, 255, 0.4);
     margin-bottom: 30px;
     text-align: center;
 }
@@ -311,10 +333,10 @@ body:hover .nav-toggle:hover {
 
 .settings-label {
     display: block;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 500;
-    letter-spacing: 2px;
-    color: rgba(140, 170, 210, 0.4);
+    letter-spacing: 3px;
+    color: rgba(255, 255, 255, 0.4);
     margin-bottom: 8px;
     text-transform: uppercase;
 }
@@ -328,45 +350,45 @@ body:hover .nav-toggle:hover {
 .settings-select,
 .settings-input {
     flex: 1;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(100, 180, 255, 0.1);
-    border-radius: 8px;
-    color: rgba(180, 200, 220, 0.7);
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 14px;
-    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    padding: 10px 14px;
     outline: none;
     transition: border-color 0.2s ease;
 }
 
 .settings-select:focus,
 .settings-input:focus {
-    border-color: rgba(100, 180, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .settings-select option {
-    background: #12141a;
-    color: #b4c8dc;
+    background: #111;
+    color: #ccc;
 }
 
 .settings-btn {
-    padding: 8px 16px;
-    background: rgba(100, 180, 255, 0.08);
-    border: 1px solid rgba(100, 180, 255, 0.15);
-    border-radius: 8px;
-    color: rgba(140, 190, 240, 0.7);
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 13px;
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
     font-weight: 500;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     cursor: pointer;
     transition: all 0.2s ease;
     white-space: nowrap;
 }
 
 .settings-btn:hover {
-    background: rgba(100, 180, 255, 0.15);
-    color: rgba(140, 200, 255, 0.9);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .settings-btn.danger {
@@ -383,7 +405,7 @@ body:hover .nav-toggle:hover {
     margin-top: 10px;
     font-size: 12px;
     font-weight: 300;
-    color: rgba(160, 185, 210, 0.5);
+    color: rgba(255, 255, 255, 0.4);
     white-space: pre-wrap;
     max-height: 200px;
     overflow-y: auto;
@@ -401,6 +423,6 @@ body:hover .nav-toggle:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(100, 180, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
     border-radius: 2px;
 }

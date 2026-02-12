@@ -61,7 +61,7 @@
         for (const p of particles) {
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(160, 190, 220, ${p.alpha})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
             ctx.fill();
         }
     }
@@ -87,7 +87,7 @@
             ctx.rotate(time * ring.rot);
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(120, 180, 230, ${alpha})`;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
             ctx.lineWidth = ring.w;
             if (ring.dash.length) ctx.setLineDash(ring.dash);
             ctx.stroke();
@@ -119,7 +119,7 @@
                 ctx.beginPath();
                 ctx.moveTo(x1, y1);
                 ctx.lineTo(x2, y2);
-                ctx.strokeStyle = `rgba(140, 180, 220, ${alpha})`;
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
                 ctx.lineWidth = g.w;
                 ctx.stroke();
             }
@@ -144,7 +144,7 @@
             ctx.beginPath();
             ctx.moveTo(startX + i * gap, y);
             ctx.lineTo(startX + i * gap, y + height * dir);
-            ctx.strokeStyle = `rgba(140, 190, 230, ${0.15 + voiceAmp * 0.3})`;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 + voiceAmp * 0.3})`;
             ctx.lineWidth = barWidth;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -159,9 +159,9 @@
         const radius = base * breathe;
 
         const glow = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius * 1.1);
-        glow.addColorStop(0, `rgba(80, 150, 220, ${0.03 + voiceAmp * 0.04})`);
-        glow.addColorStop(0.5, `rgba(60, 120, 200, ${0.015 + voiceAmp * 0.02})`);
-        glow.addColorStop(1, 'rgba(40, 80, 160, 0)');
+        glow.addColorStop(0, `rgba(200, 210, 220, ${0.03 + voiceAmp * 0.04})`);
+        glow.addColorStop(0.5, `rgba(180, 190, 200, ${0.015 + voiceAmp * 0.02})`);
+        glow.addColorStop(1, 'rgba(150, 160, 170, 0)');
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 1.1, 0, Math.PI * 2);
         ctx.fillStyle = glow;
@@ -169,20 +169,20 @@
 
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 0.65, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(15, 20, 35, ${0.6 + voiceAmp * 0.2})`;
+        ctx.fillStyle = `rgba(8, 8, 12, ${0.6 + voiceAmp * 0.2})`;
         ctx.fill();
 
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 0.65, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(100, 170, 230, ${0.25 + voiceAmp * 0.3})`;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.25 + voiceAmp * 0.3})`;
         ctx.lineWidth = 1.5 + voiceAmp * 0.5;
         ctx.stroke();
 
         const fontSize = base * 0.28;
-        ctx.font = `300 ${fontSize}px 'Rajdhani', sans-serif`;
+        ctx.font = `300 ${fontSize}px 'Inter', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = `rgba(180, 210, 240, ${0.6 + voiceAmp * 0.3})`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.6 + voiceAmp * 0.3})`;
         const letters = 'NEX';
         const spacing = fontSize * 0.55;
         const startX = cx - ((letters.length - 1) * spacing) / 2;
@@ -211,7 +211,7 @@
             ctx.rotate(time * arc.speed);
             ctx.beginPath();
             ctx.arc(0, 0, radius, arc.start, arc.end);
-            ctx.strokeStyle = `rgba(120, 180, 230, ${arc.a + voiceAmp * arc.a * 0.5})`;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${arc.a + voiceAmp * arc.a * 0.5})`;
             ctx.lineWidth = arc.w;
             ctx.lineCap = 'round';
             ctx.stroke();
