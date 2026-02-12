@@ -1,5 +1,5 @@
 """
-Tests for the Kai API Server
+Tests for the Nex API Server
 ===============================
 Tests REST endpoints and WebSocket connectivity.
 Uses FastAPI's TestClient for HTTP and WebSocket testing.
@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from kai.api.server import app
+from nex.api.server import app
 
 
 @pytest.fixture
@@ -22,8 +22,8 @@ def client():
 @pytest.fixture(autouse=True)
 def _allow_tmp_paths(tmp_path, monkeypatch):
     """Allow tmp_path in the file routes' ALLOWED_ROOTS."""
-    import kai.api.routes.files as files_mod
-    import kai.api.routes.spreadsheets as ss_mod
+    import nex.api.routes.files as files_mod
+    import nex.api.routes.spreadsheets as ss_mod
 
     monkeypatch.setattr(files_mod, "ALLOWED_ROOTS", [Path.home(), tmp_path])
     monkeypatch.setattr(ss_mod, "_safe_path", lambda p: _tmp_safe_path(p, tmp_path))
@@ -114,7 +114,7 @@ def test_files_delete(client, tmp_path):
 def test_files_read_not_found(client, tmp_path):
     """Test reading a nonexistent file returns 404."""
     response = client.post("/api/files/read", json={
-        "path": str(tmp_path / "nonexistent_kai_test_file.txt"),
+        "path": str(tmp_path / "nonexistent_nex_test_file.txt"),
     })
     assert response.status_code == 404
 

@@ -1,5 +1,5 @@
 /**
- * Python Bridge — Spawns and monitors the Kai API server.
+ * Python Bridge — Spawns and monitors the Nex API server.
  * Handles health checks, auto-restart, and graceful shutdown.
  */
 
@@ -86,23 +86,23 @@ export class PythonBridge {
   }
 
   private spawn(): void {
-    console.log('[PythonBridge] Starting python -m kai.api ...')
+    console.log('[PythonBridge] Starting python -m nex.api ...')
 
     // Find the project root (parent of desktop/)
     const projectRoot = join(__dirname, '..', '..', '..')
 
-    this.process = spawn('python3', ['-m', 'kai.api'], {
+    this.process = spawn('python3', ['-m', 'nex.api'], {
       cwd: projectRoot,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
     })
 
     this.process.stdout?.on('data', (data: Buffer) => {
-      console.log(`[Kai] ${data.toString().trim()}`)
+      console.log(`[Nex] ${data.toString().trim()}`)
     })
 
     this.process.stderr?.on('data', (data: Buffer) => {
-      console.error(`[Kai:err] ${data.toString().trim()}`)
+      console.error(`[Nex:err] ${data.toString().trim()}`)
     })
 
     this.process.on('exit', (code) => {

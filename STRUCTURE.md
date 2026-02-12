@@ -1,11 +1,11 @@
 # Project Structure
 
 ```
-Kai/
+Nex/
 │
-├── kai/                          # Main application package
+├── nex/                          # Main application package
 │   ├── __init__.py               # Package marker + version info
-│   ├── __main__.py               # Entry point (python -m kai)
+│   ├── __main__.py               # Entry point (python -m nex)
 │   │
 │   ├── core/                     # Central system components
 │   │   ├── __init__.py
@@ -15,12 +15,12 @@ Kai/
 │   ├── voice/                    # Audio input processing
 │   │   ├── __init__.py
 │   │   ├── listener.py           # Microphone capture + audio analysis
-│   │   └── wake_word.py          # "Hey Kai" detection
+│   │   └── wake_word.py          # "Hey Nex" detection
 │   │
 │   ├── speech/                   # Language processing
 │   │   ├── __init__.py
 │   │   ├── recognizer.py         # Speech-to-Text (Whisper)
-│   │   ├── synthesizer.py        # Text-to-Speech (Kai's voice)
+│   │   ├── synthesizer.py        # Text-to-Speech (Nex's voice)
 │   │   └── intent.py             # Intent classification + entities
 │   │
 │   ├── vision/                   # Camera & visual processing
@@ -80,7 +80,7 @@ Kai/
                            ▼                      ▼
                     ┌──────────────┐     ┌─────────────────┐
                     │   Gesture    │     │ SpeechSynthesizer│
-                    │  Recognizer  │     │  (Kai speaks)    │
+                    │  Recognizer  │     │  (Nex speaks)    │
                     └──────────────┘     └─────────────────┘
 ```
 
@@ -95,7 +95,7 @@ Kai/
 | Strategy              | WakeWordDetector       | Swappable detection algorithms           |
 | Template Method       | SpeechSynthesizer      | Customize steps of speech pipeline       |
 | Producer-Consumer     | SpeechSynthesizer      | Queue-based orderly speech output        |
-| Composition           | KaiEngine              | Engine contains (not inherits) modules   |
+| Composition           | NexEngine              | Engine contains (not inherits) modules   |
 | Dependency Injection  | All modules            | Dependencies passed in, not created      |
 
 ## Key Concepts by File

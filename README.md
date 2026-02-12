@@ -1,4 +1,4 @@
-# Kai - Personal AI Assistant System
+# Nex - Personal AI Assistant System
 
 > An intelligent, modular assistant inspired by Jarvis — built to see, hear, understand, and act.
 
@@ -29,7 +29,7 @@
 
 ## Project Overview
 
-**Kai** is a locally-run, privacy-first AI assistant system designed to operate as a personal smart companion. Inspired by systems like Jarvis, Kai integrates multiple recognition pipelines — voice, speech, and motion — into a unified interface that can perceive, interpret, and respond to its environment in real time.
+**Nex** is a locally-run, privacy-first AI assistant system designed to operate as a personal smart companion. Inspired by systems like Jarvis, Nex integrates multiple recognition pipelines — voice, speech, and motion — into a unified interface that can perceive, interpret, and respond to its environment in real time.
 
 All processing runs **locally on-device**, ensuring full data sovereignty with no dependency on cloud services for core functionality.
 
@@ -46,14 +46,14 @@ All processing runs **locally on-device**, ensuring full data sovereignty with n
 
 ## Dashboard UI
 
-Kai ships with a **cyberpunk neural interface** — a dark-mode web dashboard with:
+Nex ships with a **cyberpunk neural interface** — a dark-mode web dashboard with:
 
 - **Node Matrix** — a live neural network graph where hexagonal nodes represent modules, edges pulse with data flow, and the entire system reacts to voice and gesture input
 - **Particle Cloud** — 120 floating particles connected by neural pathways that follow your cursor
-- **Thought Cloud** — orbiting thought nodes with elastic mouse-following, visualizing Kai's internal processing
+- **Thought Cloud** — orbiting thought nodes with elastic mouse-following, visualizing Nex's internal processing
 - **System HUD** — module status cards with live waveforms, metric bars, and a command terminal
 
-> Launch it with `python -m kai.ui` and open `http://localhost:3000`
+> Launch it with `python -m nex.ui` and open `http://localhost:3000`
 
 ---
 
@@ -61,7 +61,7 @@ Kai ships with a **cyberpunk neural interface** — a dark-mode web dashboard wi
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                      Kai Core Engine                     │
+│                      Nex Core Engine                     │
 ├──────────┬──────────┬───────────┬────────────────────────┤
 │  Voice   │  Speech  │  Vision   │   Local I/O            │
 │  Module  │  Module  │  Module   │   Module               │
@@ -81,11 +81,11 @@ The system follows an **event-driven microkernel architecture** where each modul
 ## Project Structure
 
 ```
-Kai/
+Nex/
 │
-├── kai/                              # Main application package
+├── nex/                              # Main application package
 │   ├── __init__.py                   # Package marker + version
-│   ├── __main__.py                   # Entry point (python -m kai)
+│   ├── __main__.py                   # Entry point (python -m nex)
 │   │
 │   ├── core/                         # Central system components
 │   │   ├── engine.py                 # Orchestrator — manages all modules
@@ -93,11 +93,11 @@ Kai/
 │   │
 │   ├── voice/                        # Audio input processing
 │   │   ├── listener.py               # Microphone capture + audio analysis
-│   │   └── wake_word.py              # "Hey Kai" wake word detection
+│   │   └── wake_word.py              # "Hey Nex" wake word detection
 │   │
 │   ├── speech/                       # Language processing
 │   │   ├── recognizer.py             # Speech-to-Text (Whisper STT)
-│   │   ├── synthesizer.py            # Text-to-Speech (Kai's voice)
+│   │   ├── synthesizer.py            # Text-to-Speech (Nex's voice)
 │   │   └── intent.py                 # Intent classification + entity extraction
 │   │
 │   ├── vision/                       # Camera & visual processing
@@ -143,59 +143,59 @@ Kai/
 
 ## Core Modules
 
-### [`kai/core/engine.py`](kai/core/engine.py) — The Brain
+### [`nex/core/engine.py`](nex/core/engine.py) — The Brain
 The central orchestrator that manages all modules through their lifecycle (init → start → stop). Uses the Abstract Base Class pattern to enforce a consistent module interface. Demonstrates **dependency injection**, **composition over inheritance**, and **fault isolation**.
 
-### [`kai/core/event_bus.py`](kai/core/event_bus.py) — The Nervous System
+### [`nex/core/event_bus.py`](nex/core/event_bus.py) — The Nervous System
 Publish-subscribe event system that decouples all modules. Any module can emit events; any module can listen. Uses `asyncio.gather` for concurrent handler execution and `return_exceptions=True` for fault tolerance. Includes event history for debugging.
 
-### [`kai/voice/listener.py`](kai/voice/listener.py) — The Ears
+### [`nex/voice/listener.py`](nex/voice/listener.py) — The Ears
 Captures audio from the microphone, calculates RMS amplitude, and detects when someone is speaking. Runs in simulation mode by default (no microphone needed). Teaches **audio processing**, **async generators**, and **state machines**.
 
-### [`kai/voice/wake_word.py`](kai/voice/wake_word.py) — The Trigger
-Detects the activation phrase "Hey Kai" in transcribed text. Extracts the command that follows. Demonstrates the **Single Responsibility Principle** and the **Strategy Pattern** for swappable detection algorithms.
+### [`nex/voice/wake_word.py`](nex/voice/wake_word.py) — The Trigger
+Detects the activation phrase "Hey Nex" in transcribed text. Extracts the command that follows. Demonstrates the **Single Responsibility Principle** and the **Strategy Pattern** for swappable detection algorithms.
 
-### [`kai/speech/recognizer.py`](kai/speech/recognizer.py) — Speech to Text
+### [`nex/speech/recognizer.py`](nex/speech/recognizer.py) — Speech to Text
 Converts audio into text using on-device models (Whisper). Implements **lazy model loading** so the app starts fast and the model loads only on first use. Uses `run_in_executor` to avoid blocking the event loop during ML inference.
 
-### [`kai/speech/synthesizer.py`](kai/speech/synthesizer.py) — Kai's Voice
+### [`nex/speech/synthesizer.py`](nex/speech/synthesizer.py) — Nex's Voice
 Converts text responses into spoken audio. Uses macOS's built-in `say` command (cross-platform fallback included). Implements the **Producer-Consumer pattern** with an async queue for orderly speech output.
 
-### [`kai/speech/intent.py`](kai/speech/intent.py) — Understanding Meaning
+### [`nex/speech/intent.py`](nex/speech/intent.py) — Understanding Meaning
 Classifies user text into structured intents (e.g., `get_time`, `open_file`, `take_note`) with entity extraction. Uses regex-based pattern matching. Teaches **NLU concepts**, **dataclasses**, **regex**, and **Chain of Responsibility**.
 
-### [`kai/vision/camera.py`](kai/vision/camera.py) — The Eyes
+### [`nex/vision/camera.py`](nex/vision/camera.py) — The Eyes
 Manages camera capture with configurable FPS and resolution. Produces frames for downstream processors. Demonstrates **resource management**, **frame rate control**, and the **Producer pattern**.
 
-### [`kai/vision/motion.py`](kai/vision/motion.py) — Sensing Movement
+### [`nex/vision/motion.py`](nex/vision/motion.py) — Sensing Movement
 Detects motion by comparing consecutive frames (background subtraction). Finds contours of moving regions and reports position, size, and intensity. Teaches **frame differencing**, **contour analysis**, and **stateful processing**.
 
-### [`kai/vision/gesture.py`](kai/vision/gesture.py) — Body Language
+### [`nex/vision/gesture.py`](nex/vision/gesture.py) — Body Language
 Recognizes human gestures (wave, stop, thumbs up, point) using MediaPipe pose estimation. Applies temporal smoothing (majority voting over N frames) for reliable detection. Teaches **pose estimation**, **feature engineering**, and **classification**.
 
-### [`kai/io/file_manager.py`](kai/io/file_manager.py) — Memory on Disk
+### [`nex/io/file_manager.py`](nex/io/file_manager.py) — Memory on Disk
 Secure local file read/write with **path traversal prevention**. Validates all paths against the base directory to prevent `../../etc/passwd` attacks. Supports text and JSON, with directory listing via glob patterns.
 
-### [`kai/io/config.py`](kai/io/config.py) — Settings Manager
+### [`nex/io/config.py`](nex/io/config.py) — Settings Manager
 Layered configuration: defaults → YAML file → environment variables. Supports dot-notation access (`config.get("voice.sample_rate")`). Uses the **Singleton pattern**, **deep merge**, and **environment variable overrides**.
 
-### [`kai/utils/logger.py`](kai/utils/logger.py) — Logging
+### [`nex/utils/logger.py`](nex/utils/logger.py) — Logging
 Color-coded terminal logging with ANSI escape codes. Factory function pattern for consistent logger creation. Supports console + file output with configurable levels.
 
 ---
 
 ## Cyberpunk Dashboard
 
-The dashboard (`kai/ui/`) is a web-based neural interface with four visual layers:
+The dashboard (`nex/ui/`) is a web-based neural interface with four visual layers:
 
-### [`js/particles.js`](kai/ui/static/js/particles.js) — Neural Particle Cloud
+### [`js/particles.js`](nex/ui/static/js/particles.js) — Neural Particle Cloud
 120 floating particles with interconnecting lines, forming a constellation/neural network effect. Particles **follow your cursor** with gentle gravitational attraction. Three neon colors (cyan, magenta, purple) with individual pulse animations and glow effects.
 
-### [`js/thoughts.js`](kai/ui/static/js/thoughts.js) — Thought Cloud Orbits
+### [`js/thoughts.js`](nex/ui/static/js/thoughts.js) — Thought Cloud Orbits
 Task/process nodes that orbit the screen center with elastic spring physics. Nodes have glowing trails, bezier-curved neural pathways connecting them, and **mouse-following behavior** — the entire cloud drifts toward your cursor, simulating "following the thought."
 
-### [`js/matrix.js`](kai/ui/static/js/matrix.js) — Node Matrix Neural Network
-The centerpiece: a full neural network graph with 14 hexagonal nodes representing every Kai subsystem (Core, Event Bus, Voice, Speech, NLP, Intent, TTS, Vision, Camera, Motion, Gesture, File I/O, Memory, Config). Features:
+### [`js/matrix.js`](nex/ui/static/js/matrix.js) — Node Matrix Neural Network
+The centerpiece: a full neural network graph with 14 hexagonal nodes representing every Nex subsystem (Core, Event Bus, Voice, Speech, NLP, Intent, TTS, Vision, Camera, Motion, Gesture, File I/O, Memory, Config). Features:
 
 - **Hexagonal nodes** with energy levels, glow, and pulsing activation rings
 - **Data packets** that travel along edges as glowing orbs
@@ -207,10 +207,10 @@ The centerpiece: a full neural network graph with 14 hexagonal nodes representin
 - **Grid background** that brightens with voice input
 - **Corner HUD brackets** for the cyberpunk frame
 
-### [`js/app.js`](kai/ui/static/js/app.js) — Dashboard Controller
+### [`js/app.js`](nex/ui/static/js/app.js) — Dashboard Controller
 Manages the clock, uptime counter, waveform visualizers on module cards, system metrics simulation, thought stream panel, and command input. Bridges user input to the matrix (commands trigger full pipeline animations).
 
-### [`css/style.css`](kai/ui/static/css/style.css) — Cyberpunk Theme
+### [`css/style.css`](nex/ui/static/css/style.css) — Cyberpunk Theme
 Dark mode design system with CSS custom properties. Features: neon glow effects (box-shadow stacking), scanline overlay animation, vignette, gradient metric bars, HUD-style panels with backdrop blur, and Orbitron/Rajdhani/Share Tech Mono typography.
 
 ---
@@ -236,7 +236,7 @@ Dark mode design system with CSS custom properties. Features: neon glow effects 
 
 This project is developed at **HBO-i Level 4 (Professional)**, demonstrating advanced competencies:
 
-| Competency Area              | Level | Demonstration in Kai                                                        |
+| Competency Area              | Level | Demonstration in Nex                                                        |
 |------------------------------|-------|-----------------------------------------------------------------------------|
 | **Software Design**          | 4     | Event-driven microkernel architecture with plugin extensibility             |
 | **Software Realization**     | 4     | Multi-module async system, real-time processing, interactive dashboard      |
@@ -253,14 +253,14 @@ This project is developed at **HBO-i Level 4 (Professional)**, demonstrating adv
 
 | Pattern               | Where                                            | Why                                      |
 |-----------------------|--------------------------------------------------|------------------------------------------|
-| Observer (Pub/Sub)    | [`event_bus.py`](kai/core/event_bus.py)          | Decouple modules from each other         |
-| Abstract Base Class   | [`engine.py`](kai/core/engine.py)                | Enforce consistent module interface      |
-| Factory               | [`logger.py`](kai/utils/logger.py)               | Consistent logger creation               |
-| Singleton             | [`config.py`](kai/io/config.py)                  | One global configuration instance        |
-| Strategy              | [`wake_word.py`](kai/voice/wake_word.py)         | Swappable detection algorithms           |
-| Template Method       | [`synthesizer.py`](kai/speech/synthesizer.py)    | Customize steps of speech pipeline       |
-| Producer-Consumer     | [`synthesizer.py`](kai/speech/synthesizer.py)    | Queue-based orderly speech output        |
-| Composition           | [`engine.py`](kai/core/engine.py)                | Engine contains (not inherits) modules   |
+| Observer (Pub/Sub)    | [`event_bus.py`](nex/core/event_bus.py)          | Decouple modules from each other         |
+| Abstract Base Class   | [`engine.py`](nex/core/engine.py)                | Enforce consistent module interface      |
+| Factory               | [`logger.py`](nex/utils/logger.py)               | Consistent logger creation               |
+| Singleton             | [`config.py`](nex/io/config.py)                  | One global configuration instance        |
+| Strategy              | [`wake_word.py`](nex/voice/wake_word.py)         | Swappable detection algorithms           |
+| Template Method       | [`synthesizer.py`](nex/speech/synthesizer.py)    | Customize steps of speech pipeline       |
+| Producer-Consumer     | [`synthesizer.py`](nex/speech/synthesizer.py)    | Queue-based orderly speech output        |
+| Composition           | [`engine.py`](nex/core/engine.py)                | Engine contains (not inherits) modules   |
 | Dependency Injection  | All modules                                      | Dependencies passed in, not created      |
 
 ---
@@ -320,23 +320,23 @@ This project is developed at **HBO-i Level 4 (Professional)**, demonstrating adv
 ### Installation
 
 ```bash
-git clone https://github.com/Jazziki17/Kai.git
-cd Kai
+git clone https://github.com/Jazziki17/Nex.git
+cd Nex
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Running Kai (Backend)
+### Running Nex (Backend)
 
 ```bash
-python -m kai
+python -m nex
 ```
 
 ### Running the Dashboard
 
 ```bash
-python -m kai.ui
+python -m nex.ui
 ```
 
 Opens automatically at **http://localhost:3000** — a cyberpunk neural interface with live node-matrix visualization, particle clouds, and an interactive command terminal.

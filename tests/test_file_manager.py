@@ -16,8 +16,8 @@ This ensures:
 
 import pytest
 
-from kai.core.event_bus import EventBus
-from kai.io.file_manager import FileManager
+from nex.core.event_bus import EventBus
+from nex.io.file_manager import FileManager
 
 
 @pytest.fixture
@@ -50,17 +50,17 @@ def test_write_and_read_text(file_manager):
     """Test basic write and read operations."""
     file_manager.base_dir.mkdir(parents=True, exist_ok=True)
 
-    file_manager.write_text("test.txt", "Hello, Kai!")
+    file_manager.write_text("test.txt", "Hello, Nex!")
     content = file_manager.read_text("test.txt")
 
-    assert content == "Hello, Kai!"
+    assert content == "Hello, Nex!"
 
 
 def test_write_and_read_json(file_manager):
     """Test JSON write and read operations."""
     file_manager.base_dir.mkdir(parents=True, exist_ok=True)
 
-    data = {"name": "Kai", "version": "0.1.0", "features": ["voice", "vision"]}
+    data = {"name": "Nex", "version": "0.1.0", "features": ["voice", "vision"]}
     file_manager.write_json("config.json", data)
     result = file_manager.read_json("config.json")
 

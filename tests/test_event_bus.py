@@ -27,7 +27,7 @@ NAMING CONVENTION:
 import asyncio
 import pytest
 
-from kai.core.event_bus import EventBus
+from nex.core.event_bus import EventBus
 
 
 # ─── Fixtures ────────────────────────────────────────────────

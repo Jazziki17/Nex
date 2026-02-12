@@ -4,7 +4,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron'
 
-contextBridge.exposeInMainWorld('kai', {
+contextBridge.exposeInMainWorld('nex', {
   platform: process.platform,
   send: (channel: string, data: unknown) => {
     const validChannels = ['command', 'toggle-always-on-top']

@@ -1,7 +1,7 @@
 {
-  "name": "kai-desktop",
+  "name": "nex-desktop",
   "version": "0.1.0",
-  "description": "Kai AI Assistant — Native Desktop App",
+  "description": "Nex AI Assistant — Native Desktop App",
   "main": "dist/main/index.js",
   "scripts": {
     "build": "tsc",

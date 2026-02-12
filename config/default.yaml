@@ -1,21 +1,21 @@
 # ============================================================
-# Kai Configuration File
+# Nex Configuration File
 # ============================================================
-# This file contains the default settings for Kai.
+# This file contains the default settings for Nex.
 # Modify values here to customize behavior.
-# Environment variables (KAI_*) override these settings.
+# Environment variables (NEX_*) override these settings.
 # ============================================================
 
-kai:
-  name: "Kai"
+nex:
+  name: "Nex"
   version: "0.1.0"
 
 # --- Voice Recognition ---
 voice:
   enabled: true
   wake_words:
-    - "hey kai"
-    - "kai"
+    - "hey nex"
+    - "nex"
   sample_rate: 16000        # Hz — 16000 is standard for speech
   silence_threshold: 500    # Amplitude below this = silence
 
@@ -36,7 +36,7 @@ vision:
 
 # --- Local I/O ---
 io:
-  data_dir: "~/.kai/data"
+  data_dir: "~/.nex/data"
   max_log_size_mb: 50
 
 # --- API Server ---

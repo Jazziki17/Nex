@@ -17,13 +17,13 @@ export function createTray(pythonBridge: PythonBridge): void {
   // Make it template for macOS dark/light mode
   icon.setTemplateImage(true)
   tray = new Tray(icon)
-  tray.setToolTip('Kai AI Assistant')
+  tray.setToolTip('Nex AI Assistant')
 
   const isLoginItem = app.getLoginItemSettings().openAtLogin
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show/Hide Kai',
+      label: 'Show/Hide Nex',
       click: () => toggleWindow(),
     },
     {

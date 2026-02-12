@@ -12,8 +12,8 @@ test functions that all look the same.
 
 import pytest
 
-from kai.core.event_bus import EventBus
-from kai.speech.intent import IntentClassifier, Intent
+from nex.core.event_bus import EventBus
+from nex.speech.intent import IntentClassifier, Intent
 
 
 @pytest.fixture

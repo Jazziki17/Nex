@@ -19,19 +19,21 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
-name = "kai"
+name = "nex"
 version = "0.1.0"
 description = "Personal AI Assistant with voice, speech, and motion recognition"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 
-# Core dependencies — the minimum needed to run Kai
+# Core dependencies — the minimum needed to run Nex
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "websockets>=13.0",
     "httpx>=0.27.0",
     "psutil>=5.9.0",
+    "opencv-python>=4.9.0",
+    "ultralytics>=8.0.0",
 ]
 
 # Optional dependencies — install only what you need
@@ -45,10 +47,10 @@ tts = [
     "piper-tts>=1.2.0",
 ]
 
-# Computer Vision
+# Computer Vision (YOLO-based on-demand detection)
 vision = [
     "opencv-python>=4.9.0",
-    "mediapipe>=0.10.9",
+    "ultralytics>=8.0.0",
 ]
 
 # Spreadsheets
@@ -63,7 +65,7 @@ discovery = [
 
 # All features
 all = [
-    "kai[voice,tts,vision,spreadsheet,discovery]",
+    "nex[voice,tts,vision,spreadsheet,discovery]",
     "pyyaml>=6.0",
 ]
 

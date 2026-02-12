@@ -12,11 +12,11 @@ import {
   Alert,
   ScrollView,
 } from 'react-native'
-import { KaiClient } from '../services/KaiClient'
+import { NexClient } from '../services/NexClient'
 import { Discovery, DiscoveredServer } from '../services/Discovery'
 
 interface SettingsScreenProps {
-  client: KaiClient
+  client: NexClient
   discovery: Discovery
   onConnect: (host: string, port: number) => void
 }
@@ -40,10 +40,10 @@ export function SettingsScreen({ client, discovery, onConnect }: SettingsScreenP
     try {
       const found = await discovery.probeHost(host, parseInt(port, 10))
       if (found) {
-        Alert.alert('Connected', `Kai server found at ${host}:${port}`)
+        Alert.alert('Connected', `Nex server found at ${host}:${port}`)
         onConnect(host, parseInt(port, 10))
       } else {
-        Alert.alert('Not Found', `No Kai server at ${host}:${port}`)
+        Alert.alert('Not Found', `No Nex server at ${host}:${port}`)
       }
     } catch {
       Alert.alert('Error', 'Could not reach server')

@@ -8,7 +8,7 @@ import csv
 
 import pytest
 
-from kai.io.spreadsheet import create_csv, create_excel
+from nex.io.spreadsheet import create_csv, create_excel
 
 
 @pytest.fixture

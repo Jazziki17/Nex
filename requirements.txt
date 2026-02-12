@@ -1,5 +1,5 @@
 # ============================================================
-# Kai — Python Dependencies
+# Nex — Python Dependencies
 # ============================================================
 # Install with: pip install -r requirements.txt
 #
@@ -44,7 +44,6 @@ zeroconf>=0.131.0
 # pyaudio>=0.2.14
 # openai-whisper>=20231117
 
-# --- Optional: Computer Vision ---
-# Uncomment when ready to use camera:
-# opencv-python>=4.9.0
-# mediapipe>=0.10.9
+# --- Computer Vision (on-demand YOLO) ---
+opencv-python>=4.9.0
+ultralytics>=8.0.0

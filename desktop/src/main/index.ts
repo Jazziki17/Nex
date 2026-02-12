@@ -1,5 +1,5 @@
 /**
- * Kai Desktop — Electron Main Process
+ * Nex Desktop — Electron Main Process
  * Starts the Python API server, opens a native frameless window.
  */
 

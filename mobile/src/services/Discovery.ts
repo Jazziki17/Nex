@@ -1,5 +1,5 @@
 /**
- * Discovery — Find Kai servers on the local network via mDNS/Bonjour.
+ * Discovery — Find Nex servers on the local network via mDNS/Bonjour.
  */
 
 // Note: requires react-native-zeroconf to be installed and linked
@@ -20,8 +20,8 @@ export class Discovery {
   private scanning = false
 
   /**
-   * Start scanning for Kai servers on the local network.
-   * Uses mDNS to discover services advertised as "_kai._tcp."
+   * Start scanning for Nex servers on the local network.
+   * Uses mDNS to discover services advertised as "_nex._tcp."
    *
    * Falls back to manual IP entry if zeroconf is not available.
    */
@@ -35,7 +35,7 @@ export class Discovery {
 
       zeroconf.on('resolved', (service: any) => {
         const server: DiscoveredServer = {
-          name: service.name || 'Kai Server',
+          name: service.name || 'Nex Server',
           host: service.host,
           port: service.port || 8420,
           addresses: service.addresses || [],
@@ -54,7 +54,7 @@ export class Discovery {
         }
       })
 
-      zeroconf.scan('kai', 'tcp', 'local.')
+      zeroconf.scan('nex', 'tcp', 'local.')
     } catch {
       console.log('[Discovery] Zeroconf not available, use manual IP entry')
     }
@@ -66,7 +66,7 @@ export class Discovery {
   }
 
   /**
-   * Manually probe an IP:port to check if a Kai server is running.
+   * Manually probe an IP:port to check if a Nex server is running.
    */
   async probeHost(host: string, port: number = 8420): Promise<boolean> {
     try {
@@ -77,7 +77,7 @@ export class Discovery {
         const data = await res.json()
         if (data.status) {
           this.servers.set(host, {
-            name: 'Kai Server',
+            name: 'Nex Server',
             host,
             port,
             addresses: [host],

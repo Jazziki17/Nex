@@ -1,5 +1,5 @@
 /**
- * HomeScreen — Main screen with the Kai orb and command input.
+ * HomeScreen — Main screen with the Nex orb and command input.
  */
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -12,11 +12,11 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { KaiOrb } from '../components/KaiOrb'
-import { KaiClient } from '../services/KaiClient'
+import { NexOrb } from '../components/NexOrb'
+import { NexClient } from '../services/NexClient'
 
 interface HomeScreenProps {
-  client: KaiClient
+  client: NexClient
   serverUrl: string
 }
 
@@ -70,7 +70,7 @@ export function HomeScreen({ client, serverUrl }: HomeScreenProps) {
 
       {/* Orb */}
       <View style={styles.orbContainer}>
-        <KaiOrb serverUrl={serverUrl} />
+        <NexOrb serverUrl={serverUrl} />
       </View>
 
       {/* Response text */}

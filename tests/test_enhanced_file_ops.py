@@ -6,7 +6,7 @@ Tests the EnhancedFileOps class with configurable allowed paths.
 
 import pytest
 
-from kai.io.enhanced_file_ops import EnhancedFileOps
+from nex.io.enhanced_file_ops import EnhancedFileOps
 
 
 @pytest.fixture

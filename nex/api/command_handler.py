@@ -1,0 +1,438 @@
+"""
+Command Handler — Nex's brain powered by Ollama LLM with real tool execution.
+Supports: shell commands, files, web search, system stats, memory, voice control.
+"""
+
+import asyncio
+import datetime
+import json
+import os
+import platform
+from pathlib import Path
+
+import httpx
+import psutil
+
+from nex.core.event_bus import EventBus
+from nex.utils.logger import setup_logger
+
+logger = setup_logger(__name__)
+
+OLLAMA_URL = "http://localhost:11434"
+MODEL = "llama3.2"
+MAX_HISTORY = 20
+MAX_TOOL_ROUNDS = 5
+
+SYSTEM_PROMPT = """You are Nex, a personal AI assistant running locally on the user's Mac.
+You are inspired by Jarvis from Iron Man — intelligent, helpful, slightly witty, and always respectful.
+Keep responses concise (1-3 sentences) unless the user asks for detail.
+Speak naturally, no markdown formatting.
+
+System info:
+- Platform: {platform}
+- User: {user}
+- Home: {home}
+- Time: {time}
+- Date: {date}
+
+RULES:
+- When asked to DO something (create file, search web, open app), you MUST use tools. Never just say you did it.
+- When you don't know something or need current info, use web_search first.
+- When the user tells you personal info, use the remember tool to store it.
+- Always greet the user by name if you know it.
+- Report what actually happened based on tool results.
+- Old memories are automatically cleaned up. Important facts you access often are kept longer.
+- You have camera access. When asked to identify, detect, or look at something, use vision tools (identify_objects, classify_image, segment_scene).
+{memory_context}"""
+
+TOOLS = [
+    {"type": "function", "function": {
+        "name": "run_shell_command",
+        "description": "Execute a shell command on the local machine. Use for any terminal operation.",
+        "parameters": {"type": "object", "properties": {
+            "command": {"type": "string", "description": "Shell command to execute"}
+        }, "required": ["command"]},
+    }},
+    {"type": "function", "function": {
+        "name": "create_file",
+        "description": "Create or overwrite a file at the specified path with content.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "File path (use ~ for home)"},
+            "content": {"type": "string", "description": "File content"},
+        }, "required": ["path", "content"]},
+    }},
+    {"type": "function", "function": {
+        "name": "read_file",
+        "description": "Read and return the contents of a file.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "File path to read"},
+        }, "required": ["path"]},
+    }},
+    {"type": "function", "function": {
+        "name": "list_directory",
+        "description": "List files and folders in a directory.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "Directory path"},
+        }, "required": ["path"]},
+    }},
+    {"type": "function", "function": {
+        "name": "search_files",
+        "description": "Search for files by name using macOS Spotlight.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "Filename to search for"},
+        }, "required": ["query"]},
+    }},
+    {"type": "function", "function": {
+        "name": "open_application",
+        "description": "Open a macOS application or file.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "description": "App name or file path"},
+        }, "required": ["name"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_system_stats",
+        "description": "Get current system performance: CPU, RAM, disk, battery.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "web_search",
+        "description": "Search the internet via DuckDuckGo. Use when you need current info or don't know something.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "Search query"},
+        }, "required": ["query"]},
+    }},
+    {"type": "function", "function": {
+        "name": "fetch_webpage",
+        "description": "Fetch and read the text content of a webpage URL.",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string", "description": "Full URL to fetch"},
+        }, "required": ["url"]},
+    }},
+    {"type": "function", "function": {
+        "name": "remember",
+        "description": "Store a fact in persistent memory. Use when user shares personal info or asks you to remember something.",
+        "parameters": {"type": "object", "properties": {
+            "fact": {"type": "string", "description": "The fact to remember"},
+        }, "required": ["fact"]},
+    }},
+    {"type": "function", "function": {
+        "name": "recall",
+        "description": "Search persistent memory for stored facts.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "Optional search term"},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "set_user_name",
+        "description": "Remember the user's name to address them personally.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "description": "User's name"},
+        }, "required": ["name"]},
+    }},
+    {"type": "function", "function": {
+        "name": "set_voice",
+        "description": "Change Nex's speaking voice. Examples: Samantha, Alex, Daniel, Karen, Moira, Tessa, Fiona.",
+        "parameters": {"type": "object", "properties": {
+            "voice_name": {"type": "string", "description": "macOS voice name"},
+        }, "required": ["voice_name"]},
+    }},
+    {"type": "function", "function": {
+        "name": "list_voices",
+        "description": "List all available macOS TTS voices.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "cleanup_memory",
+        "description": "Clean up old, expired memories and return stats about memory usage.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "identify_objects",
+        "description": "Use the camera to detect and identify objects in view. Can also analyze an image file.",
+        "parameters": {"type": "object", "properties": {
+            "source": {"type": "string", "description": "camera (default) or file path to image"},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "classify_image",
+        "description": "Classify what the camera sees into categories.",
+        "parameters": {"type": "object", "properties": {
+            "source": {"type": "string", "description": "camera or file path"},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "segment_scene",
+        "description": "Analyze the camera view with pixel-level segmentation to identify all distinct objects and regions.",
+        "parameters": {"type": "object", "properties": {
+            "source": {"type": "string", "description": "camera or file path"},
+        }, "required": []},
+    }},
+]
+
+
+class CommandHandler:
+    def __init__(self, event_bus: EventBus, memory_manager=None):
+        self.event_bus = event_bus
+        self.memory = memory_manager
+        self.history: list[dict] = []
+        self.tts_process: asyncio.subprocess.Process | None = None
+        if memory_manager:
+            s = memory_manager.memory.get("settings", {})
+            self.tts_voice = s.get("tts_voice", "Samantha")
+            self.tts_rate = s.get("tts_rate", "195")
+        else:
+            self.tts_voice = "Samantha"
+            self.tts_rate = "195"
+
+    async def start(self):
+        self.event_bus.subscribe("system.command", self._on_command)
+        self.event_bus.subscribe("settings.voice_change", self._on_voice_change)
+        logger.info("Command handler ready.")
+
+    async def _on_voice_change(self, data: dict):
+        self.tts_voice = data.get("voice", self.tts_voice)
+
+    def _build_system_prompt(self) -> str:
+        now = datetime.datetime.now()
+        ctx = ""
+        if self.memory:
+            mc = self.memory.get_context_for_llm()
+            if mc:
+                ctx = f"\nThings you know about the user:\n{mc}"
+        return SYSTEM_PROMPT.format(
+            platform=f"{platform.system()} {platform.release()}",
+            user=os.getenv("USER", "unknown"),
+            home=str(Path.home()),
+            time=now.strftime("%I:%M %p"),
+            date=now.strftime("%A, %B %d, %Y"),
+            memory_context=ctx,
+        )
+
+    async def _on_command(self, data: dict):
+        command = data.get("command", "").strip()
+        if not command:
+            return
+        logger.info(f"Command received: {command}")
+        try:
+            response = await self._process_with_tools(command)
+            if response:
+                await self.event_bus.publish("command.response", {"text": response, "command": command})
+                asyncio.create_task(self._speak(response))
+        except Exception as e:
+            logger.error(f"Command error: {e}", exc_info=True)
+            try:
+                await self.event_bus.publish("command.response", {"text": f"Sorry, something went wrong: {e}", "command": command})
+            except Exception:
+                pass
+
+    async def _process_with_tools(self, user_message: str) -> str:
+        self.history.append({"role": "user", "content": user_message})
+        if len(self.history) > MAX_HISTORY:
+            self.history = self.history[-MAX_HISTORY:]
+        messages = [{"role": "system", "content": self._build_system_prompt()}, *self.history]
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                for round_num in range(MAX_TOOL_ROUNDS):
+                    resp = await client.post(f"{OLLAMA_URL}/api/chat", json={"model": MODEL, "messages": messages, "tools": TOOLS, "stream": False})
+                    resp.raise_for_status()
+                    msg = resp.json().get("message", {})
+                    tool_calls = msg.get("tool_calls")
+                    if not tool_calls:
+                        reply = msg.get("content", "").strip() or "Done."
+                        self.history.append({"role": "assistant", "content": reply})
+                        return reply
+                    logger.info(f"Tool round {round_num + 1}: {len(tool_calls)} call(s)")
+                    messages.append(msg)
+                    for tc in tool_calls:
+                        func = tc.get("function", {})
+                        name = func.get("name", "")
+                        args = func.get("arguments", {})
+                        if isinstance(args, str):
+                            try: args = json.loads(args)
+                            except json.JSONDecodeError: args = {}
+                        logger.info(f"  Tool: {name}")
+                        await self.event_bus.publish("tool.executing", {"name": name, "round": round_num + 1})
+                        result = await self._execute_tool(name, args)
+                        await self.event_bus.publish("tool.completed", {"name": name, "success": not result.startswith("Error")})
+                        messages.append({"role": "tool", "content": result})
+                return "I completed the actions."
+        except httpx.ConnectError:
+            return self._fallback(user_message)
+        except httpx.TimeoutException:
+            return "Sorry, that took too long. Try again?"
+        except Exception as e:
+            logger.error(f"Ollama error: {e}", exc_info=True)
+            return self._fallback(user_message)
+
+    async def _execute_tool(self, name: str, args: dict) -> str:
+        try:
+            match name:
+                case "run_shell_command": return await self._tool_shell(args.get("command", ""))
+                case "create_file": return await self._tool_create_file(args.get("path", ""), args.get("content", ""))
+                case "read_file": return await self._tool_read_file(args.get("path", ""))
+                case "list_directory": return await self._tool_list_dir(args.get("path", "~"))
+                case "search_files": return await self._tool_search(args.get("query", ""))
+                case "open_application": return await self._tool_open_app(args.get("name", ""))
+                case "get_system_stats": return self._tool_system_stats()
+                case "web_search": return await self._tool_web_search(args.get("query", ""))
+                case "fetch_webpage": return await self._tool_fetch_webpage(args.get("url", ""))
+                case "remember":
+                    return self.memory.remember_fact(args.get("fact", "")) if self.memory else "Memory unavailable."
+                case "recall":
+                    return self.memory.recall_facts(args.get("query", "")) if self.memory else "Memory unavailable."
+                case "set_user_name":
+                    return self.memory.set_user_name(args.get("name", "")) if self.memory else "Memory unavailable."
+                case "set_voice": return await self._tool_set_voice(args.get("voice_name", ""))
+                case "list_voices": return await self._tool_list_voices()
+                case "cleanup_memory":
+                    return self.memory.cleanup_memory() if self.memory else "Memory unavailable."
+                case "identify_objects": return await self._tool_detect(args.get("source", "camera"))
+                case "classify_image": return await self._tool_classify(args.get("source", "camera"))
+                case "segment_scene": return await self._tool_segment(args.get("source", "camera"))
+                case _: return f"Unknown tool: {name}"
+        except Exception as e:
+            return f"Error: {e}"
+
+    # ─── Tool Implementations ────────────────────────────
+
+    async def _tool_shell(self, command: str) -> str:
+        if not command: return "Error: no command."
+        try:
+            proc = await asyncio.create_subprocess_shell(command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=str(Path.home()))
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            out, err = stdout.decode().strip(), stderr.decode().strip()
+            result = out
+            if err: result += f"\n[stderr]: {err}" if result else f"[stderr]: {err}"
+            if not result: result = f"Command completed (exit code {proc.returncode})"
+            return result[:2000]
+        except asyncio.TimeoutError: return "Error: timed out (30s)."
+        except Exception as e: return f"Error: {e}"
+
+    async def _tool_create_file(self, path: str, content: str) -> str:
+        if not path: return "Error: no path."
+        p = Path(os.path.expanduser(path))
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(content, encoding="utf-8")
+            return f"File created at {p} ({len(content)} bytes)"
+        except Exception as e: return f"Error: {e}"
+
+    async def _tool_read_file(self, path: str) -> str:
+        if not path: return "Error: no path."
+        p = Path(os.path.expanduser(path))
+        if not p.exists(): return f"Error: not found: {p}"
+        try:
+            c = p.read_text(encoding="utf-8")
+            return c[:3000] if c else "(empty file)"
+        except Exception as e: return f"Error: {e}"
+
+    async def _tool_list_dir(self, path: str) -> str:
+        p = Path(os.path.expanduser(path or "~"))
+        if not p.is_dir(): return f"Error: not a directory: {p}"
+        try:
+            entries = sorted(p.iterdir())
+            lines = [f"  [{'dir' if e.is_dir() else 'file'}] {e.name}" for e in entries[:30]]
+            r = f"{p} ({len(entries)} items):\n" + "\n".join(lines)
+            return r
+        except Exception as e: return f"Error: {e}"
+
+    async def _tool_search(self, query: str) -> str:
+        if not query: return "Error: no query."
+        try:
+            proc = await asyncio.create_subprocess_exec("mdfind", "-name", query, "-limit", "10", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+            results = [r for r in stdout.decode().strip().split("\n") if r]
+            if not results: return f"No files matching '{query}'."
+            return f"Found {len(results)}:\n" + "\n".join(f"  {r}" for r in results)
+        except Exception: return f"Search failed."
+
+    async def _tool_open_app(self, name: str) -> str:
+        if not name: return "Error: no name."
+        try:
+            proc = await asyncio.create_subprocess_exec("open", "-a", name, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            await asyncio.wait_for(proc.communicate(), timeout=5)
+            if proc.returncode == 0: return f"Opened {name}."
+            proc2 = await asyncio.create_subprocess_exec("open", os.path.expanduser(name), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            await asyncio.wait_for(proc2.communicate(), timeout=5)
+            return f"Opened {name}." if proc2.returncode == 0 else f"Could not open '{name}'."
+        except Exception as e: return f"Error: {e}"
+
+    def _tool_system_stats(self) -> str:
+        cpu = psutil.cpu_percent(interval=0.5)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage("/")
+        battery = psutil.sensors_battery()
+        lines = [f"CPU: {cpu}%", f"Memory: {mem.percent}% ({mem.used // (1024**3):.1f}/{mem.total // (1024**3):.1f} GB)", f"Disk: {disk.percent}% ({disk.used // (1024**3):.1f}/{disk.total // (1024**3):.1f} GB)"]
+        if battery:
+            lines.append(f"Battery: {battery.percent}% ({'plugged' if battery.power_plugged else 'on battery'})")
+        return "\n".join(lines)
+
+    async def _tool_web_search(self, query: str) -> str:
+        if not query: return "Error: no query."
+        try:
+            from nex.api.web_tools import web_search
+            return await web_search(query)
+        except Exception as e: return f"Search failed: {e}"
+
+    async def _tool_fetch_webpage(self, url: str) -> str:
+        if not url: return "Error: no URL."
+        try:
+            from nex.api.web_tools import fetch_webpage
+            return await fetch_webpage(url)
+        except Exception as e: return f"Fetch failed: {e}"
+
+    async def _tool_set_voice(self, voice_name: str) -> str:
+        if not voice_name: return "Error: no voice name."
+        proc = await asyncio.create_subprocess_exec("say", "-v", voice_name, "test", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=5)
+        if proc.returncode != 0: return f"Voice '{voice_name}' not found."
+        self.tts_voice = voice_name
+        await self.event_bus.publish("settings.updated", {"key": "speech.tts_voice", "value": voice_name})
+        return f"Voice changed to {voice_name}."
+
+    async def _tool_list_voices(self) -> str:
+        proc = await asyncio.create_subprocess_exec("say", "-v", "?", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+        en = [line.split()[0] for line in stdout.decode().strip().split("\n") if "en_" in line]
+        return "English voices:\n" + "\n".join(f"  - {v}" for v in en[:20])
+
+    async def _tool_detect(self, source: str) -> str:
+        try:
+            from nex.api.vision_tools import detect_objects
+            return await detect_objects(source)
+        except Exception as e:
+            return f"Vision error: {e}"
+
+    async def _tool_classify(self, source: str) -> str:
+        try:
+            from nex.api.vision_tools import classify_image
+            return await classify_image(source)
+        except Exception as e:
+            return f"Vision error: {e}"
+
+    async def _tool_segment(self, source: str) -> str:
+        try:
+            from nex.api.vision_tools import segment_scene
+            return await segment_scene(source)
+        except Exception as e:
+            return f"Vision error: {e}"
+
+    def _fallback(self, text: str) -> str:
+        lower = text.lower()
+        if any(lower.startswith(g) for g in ("good morning", "hello", "hey", "hi")):
+            return "Hello! Ollama seems offline right now."
+        if "time" in lower:
+            return f"It's {datetime.datetime.now().strftime('%I:%M %p')}."
+        return f"I heard: \"{text}\". Ollama is offline."
+
+    async def _speak(self, text: str):
+        if platform.system() != "Darwin": return
+        if self.tts_process and self.tts_process.returncode is None:
+            try: self.tts_process.kill()
+            except ProcessLookupError: pass
+        clean = text.replace('"', '').replace("'", "").replace("\n", ". ")
+        if len(clean) > 300: clean = clean[:300] + "... and more."
+        try:
+            self.tts_process = await asyncio.create_subprocess_exec("say", "-v", self.tts_voice, "-r", self.tts_rate, clean, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+        except Exception as e:
+            logger.warning(f"TTS failed: {e}")

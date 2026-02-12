@@ -1,5 +1,5 @@
 /**
- * FilesScreen — Remote file browser connected to Kai server.
+ * FilesScreen — Remote file browser connected to Nex server.
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
@@ -12,10 +12,10 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native'
-import { KaiClient, FileEntry } from '../services/KaiClient'
+import { NexClient, FileEntry } from '../services/NexClient'
 
 interface FilesScreenProps {
-  client: KaiClient
+  client: NexClient
 }
 
 export function FilesScreen({ client }: FilesScreenProps) {
