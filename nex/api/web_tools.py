@@ -1,18 +1,35 @@
-"""Web tools — DuckDuckGo search and webpage fetching."""
+"""Web tools — DuckDuckGo search and webpage fetching with retry logic."""
 
+import asyncio
 import re
+
 import httpx
 
 SEARCH_URL = "https://html.duckduckgo.com/html/"
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Nex/0.1"
 TIMEOUT = 15.0
+MAX_RETRIES = 3
+
+
+async def _retry(coro_fn, retries=MAX_RETRIES):
+    """Execute an async callable with exponential backoff."""
+    for attempt in range(retries):
+        try:
+            return await coro_fn()
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError) as e:
+            if attempt == retries - 1:
+                raise
+            await asyncio.sleep(0.5 * (2 ** attempt))
 
 
 async def web_search(query: str, max_results: int = 5) -> str:
-    async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
-        resp = await client.post(SEARCH_URL, data={"q": query}, headers={"User-Agent": USER_AGENT})
-        resp.raise_for_status()
-    html = resp.text
+    async def _do():
+        async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
+            resp = await client.post(SEARCH_URL, data={"q": query}, headers={"User-Agent": USER_AGENT})
+            resp.raise_for_status()
+        return resp.text
+
+    html = await _retry(_do)
     links = re.findall(r'<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>', html, re.DOTALL)
     snips = re.findall(r'<a[^>]*class="result__snippet"[^>]*>(.*?)</a>', html, re.DOTALL)
     if not links:
@@ -26,10 +43,13 @@ async def web_search(query: str, max_results: int = 5) -> str:
 
 
 async def fetch_webpage(url: str, max_chars: int = 3000) -> str:
-    async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
-        resp = await client.get(url, headers={"User-Agent": USER_AGENT})
-        resp.raise_for_status()
-    html = resp.text
+    async def _do():
+        async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
+            resp = await client.get(url, headers={"User-Agent": USER_AGENT})
+            resp.raise_for_status()
+        return resp.text
+
+    html = await _retry(_do)
     html = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', html, flags=re.DOTALL | re.IGNORECASE)
     text = re.sub(r'<[^>]+>', ' ', html)
     text = re.sub(r'\s+', ' ', text).strip()

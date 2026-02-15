@@ -1,11 +1,9 @@
 /**
- * NEX Settings — Voice selection, memory controls, user preferences.
+ * NEX Settings — Memory controls, user preferences.
  */
 
 (() => {
     const API = `${location.protocol}//${location.hostname || 'localhost'}:${location.port || 8420}/api/settings`;
-    const voiceSelect = document.getElementById('voice-select');
-    const voiceTest = document.getElementById('voice-test');
     const memoryView = document.getElementById('memory-view');
     const memoryClear = document.getElementById('memory-clear');
     const memoryOutput = document.getElementById('memory-output');
@@ -19,55 +17,8 @@
             const resp = await fetch(API + '/current');
             const data = await resp.json();
             if (data.user_name) userNameInput.value = data.user_name;
-            // Load voices then select current
-            await loadVoices(data.voice || 'Samantha');
         } catch {}
     }
-
-    // ─── Voice list ─────────────────────────────────────
-
-    async function loadVoices(currentVoice) {
-        try {
-            const resp = await fetch(API + '/voices');
-            const data = await resp.json();
-            voiceSelect.innerHTML = '';
-            for (const v of data.voices) {
-                const opt = document.createElement('option');
-                opt.value = v.name;
-                opt.textContent = v.name + ' (' + v.language + ')';
-                if (v.name === currentVoice) opt.selected = true;
-                voiceSelect.appendChild(opt);
-            }
-        } catch {
-            voiceSelect.innerHTML = '<option value="">Failed to load</option>';
-        }
-    }
-
-    // ─── Voice change ───────────────────────────────────
-
-    voiceSelect.addEventListener('change', async () => {
-        const voice = voiceSelect.value;
-        if (!voice) return;
-        try {
-            await fetch(API + '/voice', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ voice }),
-            });
-        } catch {}
-    });
-
-    // ─── Voice test ─────────────────────────────────────
-
-    voiceTest.addEventListener('click', () => {
-        const ws = window._nexWs;
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: 'command',
-                command: 'Say hello and introduce yourself briefly',
-            }));
-        }
-    });
 
     // ─── Memory controls ────────────────────────────────
 
@@ -105,14 +56,6 @@
         const ws = window._nexWs;
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'command', command: `My name is ${name}. Remember it.` }));
-        }
-    });
-
-    // ─── Sync from events ───────────────────────────────
-
-    window.addEventListener('nex:settings.voice_change', (e) => {
-        if (e.detail && e.detail.voice) {
-            voiceSelect.value = e.detail.voice;
         }
     });
 

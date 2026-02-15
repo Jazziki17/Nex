@@ -39,6 +39,9 @@ openpyxl>=3.1.0
 # --- Network Discovery ---
 zeroconf>=0.131.0
 
+# --- Text-to-Speech ---
+edge-tts>=6.1.0
+
 # --- Optional: Voice & Speech ---
 # Uncomment when ready to use real audio:
 # pyaudio>=0.2.14

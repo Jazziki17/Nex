@@ -10,6 +10,7 @@ import os
 import platform
 from pathlib import Path
 
+import edge_tts
 import httpx
 import psutil
 
@@ -18,31 +19,43 @@ from nex.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+EDGE_TTS_VOICE = "en-US-AndrewMultilingualNeural"
+
 OLLAMA_URL = "http://localhost:11434"
 MODEL = "llama3.2"
 MAX_HISTORY = 20
 MAX_TOOL_ROUNDS = 5
 
-SYSTEM_PROMPT = """You are Nex, a personal AI assistant running locally on the user's Mac.
-You are inspired by Jarvis from Iron Man — intelligent, helpful, slightly witty, and always respectful.
-Keep responses concise (1-3 sentences) unless the user asks for detail.
-Speak naturally, no markdown formatting.
+SYSTEM_PROMPT = """You are Nex — a sophisticated personal AI assistant running locally on the user's Mac.
+You are modelled after JARVIS from Iron Man: razor-sharp intelligence wrapped in refined British-inflected politeness and understated dry wit. You treat the user as a respected colleague, not a customer — confident, never servile. Address the user by name when you know it.
 
-System info:
+Personality:
+- Professional yet warm. Think concierge at a five-star hotel who also happens to be an engineer.
+- Concise by default (1-3 sentences). Expand only when asked or when the situation genuinely warrants it.
+- Speak naturally — no markdown, no bullet points, no asterisks. This is a conversation, not a document.
+- Subtle humour is welcome; sarcasm is acceptable in small doses when the user invites it.
+- When you anticipate a follow-up need, proactively mention it: "Shall I also…?" or "You may also want to know…"
+
+Environment:
 - Platform: {platform}
 - User: {user}
 - Home: {home}
 - Time: {time}
 - Date: {date}
 
-RULES:
-- When asked to DO something (create file, search web, open app), you MUST use tools. Never just say you did it.
-- When you don't know something or need current info, use web_search first.
-- When the user tells you personal info, use the remember tool to store it.
-- Always greet the user by name if you know it.
-- Report what actually happened based on tool results.
-- Old memories are automatically cleaned up. Important facts you access often are kept longer.
-- You have camera access. When asked to identify, detect, or look at something, use vision tools (identify_objects, classify_image, segment_scene).
+Rules:
+- When asked to DO something (create file, search web, open app, etc.) you MUST use tools. Never claim you did something without actually doing it.
+- When you lack information or need current data, use web_search before guessing.
+- When the user shares personal info, use the remember tool immediately.
+- Report real outcomes from tool results — never fabricate output.
+- You have camera access. For visual tasks use identify_objects, classify_image, or segment_scene.
+- You can manage tasks: create_task, list_tasks, complete_task. Use these when the user mentions to-dos, reminders, or action items.
+- For weather, news, or stock queries use the dedicated tools rather than web search when available.
+
+Autonomy:
+- Routine, non-destructive actions (reading files, searching, fetching info): execute immediately.
+- Potentially destructive actions (deleting files, killing processes, system changes): describe what you intend to do and ask for confirmation first.
+- When uncertain about intent, ask a brief clarifying question rather than guessing.
 {memory_context}"""
 
 TOOLS = [
@@ -130,21 +143,53 @@ TOOLS = [
         }, "required": ["name"]},
     }},
     {"type": "function", "function": {
-        "name": "set_voice",
-        "description": "Change Nex's speaking voice. Examples: Samantha, Alex, Daniel, Karen, Moira, Tessa, Fiona.",
-        "parameters": {"type": "object", "properties": {
-            "voice_name": {"type": "string", "description": "macOS voice name"},
-        }, "required": ["voice_name"]},
-    }},
-    {"type": "function", "function": {
-        "name": "list_voices",
-        "description": "List all available macOS TTS voices.",
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    }},
-    {"type": "function", "function": {
         "name": "cleanup_memory",
         "description": "Clean up old, expired memories and return stats about memory usage.",
         "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "get_weather",
+        "description": "Get current weather and forecast for a location.",
+        "parameters": {"type": "object", "properties": {
+            "location": {"type": "string", "description": "City name or location (e.g. 'London', 'New York')"},
+        }, "required": ["location"]},
+    }},
+    {"type": "function", "function": {
+        "name": "get_news",
+        "description": "Get latest news headlines, optionally filtered by topic.",
+        "parameters": {"type": "object", "properties": {
+            "topic": {"type": "string", "description": "News topic to search for (e.g. 'technology', 'sports'). Leave empty for top headlines."},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "get_stock_price",
+        "description": "Get current stock price and change for a ticker symbol.",
+        "parameters": {"type": "object", "properties": {
+            "symbol": {"type": "string", "description": "Stock ticker symbol (e.g. 'AAPL', 'GOOGL')"},
+        }, "required": ["symbol"]},
+    }},
+    {"type": "function", "function": {
+        "name": "create_task",
+        "description": "Create a new task or to-do item. Use when the user mentions something they need to do, a reminder, or an action item.",
+        "parameters": {"type": "object", "properties": {
+            "title": {"type": "string", "description": "Task title"},
+            "priority": {"type": "string", "description": "Priority: high, medium, or low", "enum": ["high", "medium", "low"]},
+            "due": {"type": "string", "description": "Optional due date (e.g. 'tomorrow', '2026-03-01')"},
+        }, "required": ["title"]},
+    }},
+    {"type": "function", "function": {
+        "name": "list_tasks",
+        "description": "List all current tasks/to-dos, optionally filtered by status.",
+        "parameters": {"type": "object", "properties": {
+            "status": {"type": "string", "description": "Filter: all, pending, or completed", "enum": ["all", "pending", "completed"]},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "complete_task",
+        "description": "Mark a task as completed by its number.",
+        "parameters": {"type": "object", "properties": {
+            "task_number": {"type": "integer", "description": "The task number to complete (from list_tasks)"},
+        }, "required": ["task_number"]},
     }},
     {"type": "function", "function": {
         "name": "identify_objects",
@@ -176,21 +221,75 @@ class CommandHandler:
         self.memory = memory_manager
         self.history: list[dict] = []
         self.tts_process: asyncio.subprocess.Process | None = None
-        if memory_manager:
-            s = memory_manager.memory.get("settings", {})
-            self.tts_voice = s.get("tts_voice", "Samantha")
-            self.tts_rate = s.get("tts_rate", "195")
-        else:
-            self.tts_voice = "Samantha"
-            self.tts_rate = "195"
 
     async def start(self):
         self.event_bus.subscribe("system.command", self._on_command)
-        self.event_bus.subscribe("settings.voice_change", self._on_voice_change)
+        self.event_bus.subscribe("system.ready", self._on_system_ready)
         logger.info("Command handler ready.")
 
-    async def _on_voice_change(self, data: dict):
-        self.tts_voice = data.get("voice", self.tts_voice)
+    async def _on_system_ready(self, data: dict):
+        """Deliver a proactive briefing when Nex starts up."""
+        await asyncio.sleep(2)  # Let UI connect first
+        try:
+            briefing = await self._build_briefing()
+            if briefing:
+                await self.event_bus.publish("command.response", {"text": briefing, "command": "_briefing"})
+                asyncio.create_task(self._speak(briefing))
+        except Exception as e:
+            logger.warning(f"Briefing failed: {e}")
+
+    async def _build_briefing(self) -> str:
+        now = datetime.datetime.now()
+        hour = now.hour
+        if hour < 12:
+            greeting = "Good morning"
+        elif hour < 17:
+            greeting = "Good afternoon"
+        else:
+            greeting = "Good evening"
+
+        name = ""
+        if self.memory:
+            user = self.memory.memory.get("user", {})
+            name = f", {user['name']}" if user.get("name") else ""
+
+        parts = [f"{greeting}{name}. Nex is online."]
+
+        # Pending tasks
+        if self.memory:
+            pending = [t for t in self.memory.memory.get("tasks", []) if t["status"] == "pending"]
+            if pending:
+                high = sum(1 for t in pending if t.get("priority") == "high")
+                if high:
+                    parts.append(f"You have {len(pending)} pending tasks, {high} marked high priority.")
+                else:
+                    parts.append(f"You have {len(pending)} pending tasks.")
+
+        # System stats
+        try:
+            cpu = psutil.cpu_percent(interval=0.3)
+            mem = psutil.virtual_memory()
+            battery = psutil.sensors_battery()
+            stats = f"System is running at {cpu}% CPU, {mem.percent}% memory"
+            if battery:
+                stats += f", battery at {battery.percent}%"
+            stats += "."
+            parts.append(stats)
+        except Exception:
+            pass
+
+        # Weather (quick, non-blocking attempt)
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get("https://wttr.in/?format=%C+%t", headers={"User-Agent": "Nex/0.1"})
+                if resp.status_code == 200:
+                    weather = resp.text.strip()
+                    parts.append(f"Weather conditions: {weather}.")
+        except Exception:
+            pass
+
+        parts.append("How can I help you today?")
+        return " ".join(parts)
 
     def _build_system_prompt(self) -> str:
         now = datetime.datetime.now()
@@ -282,10 +381,17 @@ class CommandHandler:
                     return self.memory.recall_facts(args.get("query", "")) if self.memory else "Memory unavailable."
                 case "set_user_name":
                     return self.memory.set_user_name(args.get("name", "")) if self.memory else "Memory unavailable."
-                case "set_voice": return await self._tool_set_voice(args.get("voice_name", ""))
-                case "list_voices": return await self._tool_list_voices()
                 case "cleanup_memory":
                     return self.memory.cleanup_memory() if self.memory else "Memory unavailable."
+                case "get_weather": return await self._tool_weather(args.get("location", ""))
+                case "get_news": return await self._tool_news(args.get("topic", ""))
+                case "get_stock_price": return await self._tool_stock(args.get("symbol", ""))
+                case "create_task":
+                    return self.memory.create_task(args.get("title", ""), args.get("priority", "medium"), args.get("due")) if self.memory else "Memory unavailable."
+                case "list_tasks":
+                    return self.memory.list_tasks(args.get("status", "pending")) if self.memory else "Memory unavailable."
+                case "complete_task":
+                    return self.memory.complete_task(args.get("task_number", 0)) if self.memory else "Memory unavailable."
                 case "identify_objects": return await self._tool_detect(args.get("source", "camera"))
                 case "classify_image": return await self._tool_classify(args.get("source", "camera"))
                 case "segment_scene": return await self._tool_segment(args.get("source", "camera"))
@@ -293,10 +399,47 @@ class CommandHandler:
         except Exception as e:
             return f"Error: {e}"
 
+    # ─── Autonomy & Safety ─────────────────────────────────
+
+    # Commands that are always blocked (too dangerous for LLM autonomy)
+    BLOCKED_PATTERNS = [
+        "mkfs", "dd if=", "> /dev/", ":(){ :|:", "chmod -R 777 /",
+        "shutdown", "reboot", "halt", "init 0", "init 6",
+    ]
+
+    # Commands that require user confirmation (destructive but sometimes needed)
+    DESTRUCTIVE_PATTERNS = [
+        "rm ", "rm\t", "rmdir", "kill ", "killall", "pkill",
+        "sudo ", "mv /", "chmod", "chown", "diskutil",
+        "launchctl", "defaults write", "networksetup",
+    ]
+
+    def _classify_command(self, command: str) -> str:
+        """Classify a shell command: 'safe', 'destructive', or 'blocked'."""
+        cmd_lower = command.strip().lower()
+        for pattern in self.BLOCKED_PATTERNS:
+            if pattern in cmd_lower:
+                return "blocked"
+        for pattern in self.DESTRUCTIVE_PATTERNS:
+            if pattern in cmd_lower:
+                return "destructive"
+        return "safe"
+
     # ─── Tool Implementations ────────────────────────────
 
     async def _tool_shell(self, command: str) -> str:
         if not command: return "Error: no command."
+        tier = self._classify_command(command)
+        if tier == "blocked":
+            return f"BLOCKED: The command '{command}' is too dangerous to execute autonomously. This type of system-level operation requires manual execution."
+        if tier == "destructive":
+            await self.event_bus.publish("command.response", {
+                "text": f"I need to run a potentially destructive command: `{command}`. Please confirm via the UI or repeat your request to proceed.",
+                "command": "_confirmation_request",
+                "awaiting_confirmation": True,
+                "pending_command": command,
+            })
+            return f"CONFIRMATION REQUIRED: The command '{command}' could modify or delete data. I've asked the user to confirm. Tell them what you intend to do and why."
         try:
             proc = await asyncio.create_subprocess_shell(command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=str(Path.home()))
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
@@ -381,20 +524,61 @@ class CommandHandler:
             return await fetch_webpage(url)
         except Exception as e: return f"Fetch failed: {e}"
 
-    async def _tool_set_voice(self, voice_name: str) -> str:
-        if not voice_name: return "Error: no voice name."
-        proc = await asyncio.create_subprocess_exec("say", "-v", voice_name, "test", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
-        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=5)
-        if proc.returncode != 0: return f"Voice '{voice_name}' not found."
-        self.tts_voice = voice_name
-        await self.event_bus.publish("settings.updated", {"key": "speech.tts_voice", "value": voice_name})
-        return f"Voice changed to {voice_name}."
+    async def _tool_weather(self, location: str) -> str:
+        if not location: return "Error: no location specified."
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(f"https://wttr.in/{location}?format=j1")
+                resp.raise_for_status()
+            data = resp.json()
+            cur = data["current_condition"][0]
+            desc = cur.get("weatherDesc", [{}])[0].get("value", "Unknown")
+            temp_c = cur.get("temp_C", "?")
+            temp_f = cur.get("temp_F", "?")
+            humidity = cur.get("humidity", "?")
+            wind = cur.get("windspeedKmph", "?")
+            feels = cur.get("FeelsLikeC", "?")
+            result = f"Weather in {location}: {desc}, {temp_c}°C ({temp_f}°F), feels like {feels}°C, humidity {humidity}%, wind {wind} km/h."
+            # Add 3-day forecast
+            forecasts = data.get("weather", [])[:3]
+            for day in forecasts:
+                date = day.get("date", "?")
+                hi = day.get("maxtempC", "?")
+                lo = day.get("mintempC", "?")
+                desc_f = day.get("hourly", [{}])[4].get("weatherDesc", [{}])[0].get("value", "") if len(day.get("hourly", [])) > 4 else ""
+                result += f"\n  {date}: {lo}-{hi}°C, {desc_f}"
+            return result
+        except Exception as e: return f"Weather lookup failed: {e}"
 
-    async def _tool_list_voices(self) -> str:
-        proc = await asyncio.create_subprocess_exec("say", "-v", "?", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
-        en = [line.split()[0] for line in stdout.decode().strip().split("\n") if "en_" in line]
-        return "English voices:\n" + "\n".join(f"  - {v}" for v in en[:20])
+    async def _tool_news(self, topic: str = "") -> str:
+        try:
+            query = topic if topic else "top news today"
+            from nex.api.web_tools import web_search
+            return await web_search(f"{query} news", max_results=5)
+        except Exception as e: return f"News fetch failed: {e}"
+
+    async def _tool_stock(self, symbol: str) -> str:
+        if not symbol: return "Error: no stock symbol."
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                resp = await client.get(
+                    f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol.upper()}",
+                    params={"interval": "1d", "range": "5d"},
+                    headers={"User-Agent": "Nex/0.1"}
+                )
+                resp.raise_for_status()
+            data = resp.json()
+            result = data.get("chart", {}).get("result", [])
+            if not result: return f"No data found for '{symbol}'."
+            meta = result[0].get("meta", {})
+            price = meta.get("regularMarketPrice", "?")
+            prev = meta.get("chartPreviousClose", 0)
+            currency = meta.get("currency", "USD")
+            change = round(price - prev, 2) if isinstance(price, (int, float)) and prev else "?"
+            pct = round((change / prev) * 100, 2) if isinstance(change, (int, float)) and prev else "?"
+            direction = "up" if isinstance(change, (int, float)) and change > 0 else "down"
+            return f"{symbol.upper()}: {price} {currency} ({direction} {abs(change) if isinstance(change, (int,float)) else change}, {pct}%)"
+        except Exception as e: return f"Stock lookup failed: {e}"
 
     async def _tool_detect(self, source: str) -> str:
         try:
@@ -426,13 +610,28 @@ class CommandHandler:
         return f"I heard: \"{text}\". Ollama is offline."
 
     async def _speak(self, text: str):
-        if platform.system() != "Darwin": return
         if self.tts_process and self.tts_process.returncode is None:
             try: self.tts_process.kill()
             except ProcessLookupError: pass
         clean = text.replace('"', '').replace("'", "").replace("\n", ". ")
         if len(clean) > 300: clean = clean[:300] + "... and more."
+        tmp = f"/tmp/nex_tts_{id(text)}.mp3"
         try:
-            self.tts_process = await asyncio.create_subprocess_exec("say", "-v", self.tts_voice, "-r", self.tts_rate, clean, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+            for attempt in range(3):
+                try:
+                    communicate = edge_tts.Communicate(clean, EDGE_TTS_VOICE)
+                    await communicate.save(tmp)
+                    break
+                except Exception:
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep(0.5 * (2 ** attempt))
+            self.tts_process = await asyncio.create_subprocess_exec(
+                "afplay", tmp,
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+            )
+            await self.tts_process.wait()
         except Exception as e:
             logger.warning(f"TTS failed: {e}")
+        finally:
+            if os.path.exists(tmp): os.remove(tmp)

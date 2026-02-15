@@ -102,6 +102,9 @@ class EventBus:
         if data is None:
             data = {}
 
+        # Tag data so handlers know which event fired
+        data["_event_type"] = event_type
+
         # Add metadata to every event
         event = {
             "type": event_type,

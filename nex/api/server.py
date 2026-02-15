@@ -84,6 +84,13 @@ async def _start_engine(eng: NexEngine):
         await handler.start()
         logger.info("  [OK] CommandHandler")
 
+        # Start Audit Logger (persistent action log)
+        from nex.api.audit_logger import AuditLogger
+        audit = AuditLogger(eng.event_bus)
+        await audit.start()
+        eng._audit_logger = audit
+        logger.info("  [OK] AuditLogger")
+
         # Start MicListener (real microphone → whisper STT → commands)
         mic = None
         try:
@@ -95,7 +102,20 @@ async def _start_engine(eng: NexEngine):
         except Exception as e:
             logger.warning(f"  [SKIP] MicListener: {e}")
 
-        loaded = [m.name for m in eng._modules] + ["MemoryManager", "SystemMonitor", "CommandHandler"]
+        # Load plugins from nex/plugins/ directory
+        plugin_names = []
+        try:
+            from nex.plugins import discover_plugins
+            plugins = discover_plugins(eng.event_bus)
+            for plugin in plugins:
+                eng.register_module(plugin)
+                await plugin.start()
+                plugin_names.append(plugin.name)
+                logger.info(f"  [OK] Plugin: {plugin.name}")
+        except Exception as e:
+            logger.warning(f"  [SKIP] Plugin loading: {e}")
+
+        loaded = [m.name for m in eng._modules] + ["MemoryManager", "SystemMonitor", "CommandHandler", "AuditLogger"] + plugin_names
         if mic:
             loaded.append("MicListener")
         await eng.event_bus.publish("system.ready", {

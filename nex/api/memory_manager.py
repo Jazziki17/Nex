@@ -25,6 +25,7 @@ MEMORY_FILE = MEMORY_DIR / "memory.json"
 DEFAULT_MEMORY = {
     "user": {"name": None, "preferences": {}},
     "facts": [],
+    "tasks": [],
     "settings": {"tts_voice": "Samantha", "tts_rate": "195"},
     "last_updated": None,
 }
@@ -124,13 +125,8 @@ class MemoryManager:
             logger.error(f"Failed to save memory: {e}")
 
     async def start(self):
-        self.event_bus.subscribe("settings.voice_change", self._on_voice_change)
         self.event_bus.subscribe("settings.updated", self._on_setting_updated)
         logger.info("MemoryManager started")
-
-    async def _on_voice_change(self, data: dict):
-        self.memory.setdefault("settings", {})["tts_voice"] = data.get("voice", "Samantha")
-        self.save()
 
     async def _on_setting_updated(self, data: dict):
         key = data.get("key", "")
@@ -232,7 +228,62 @@ class MemoryManager:
         if facts:
             recent = facts[-10:]
             parts.append("Things you remember:\n" + "\n".join(f"- {f['fact']}" for f in recent))
+        pending = [t for t in self.memory.get("tasks", []) if t["status"] == "pending"]
+        if pending:
+            task_lines = []
+            for i, t in enumerate(pending[:5], 1):
+                due = f" (due {t['due']})" if t.get("due") else ""
+                task_lines.append(f"- [{t.get('priority','medium')[0].upper()}] {t['title']}{due}")
+            parts.append(f"Pending tasks ({len(pending)}):\n" + "\n".join(task_lines))
         return "\n".join(parts)
+
+    # ─── Task Management ─────────────────────────────────
+
+    def create_task(self, title: str, priority: str = "medium", due: str | None = None) -> str:
+        if not title:
+            return "Error: task title is required."
+        task = {
+            "title": title,
+            "priority": priority,
+            "due": due,
+            "status": "pending",
+            "created": datetime.now().isoformat(),
+        }
+        self.memory.setdefault("tasks", []).append(task)
+        self.save()
+        num = len(self.memory["tasks"])
+        due_str = f", due {due}" if due else ""
+        return f"Task #{num} created: {title} [{priority}]{due_str}"
+
+    def list_tasks(self, status_filter: str = "pending") -> str:
+        tasks = self.memory.get("tasks", [])
+        if not tasks:
+            return "No tasks yet."
+        if status_filter and status_filter != "all":
+            filtered = [(i, t) for i, t in enumerate(tasks, 1) if t["status"] == status_filter]
+        else:
+            filtered = list(enumerate(tasks, 1))
+        if not filtered:
+            return f"No {status_filter} tasks."
+        lines = []
+        for num, task in filtered:
+            marker = "x" if task["status"] == "completed" else " "
+            pri = task.get("priority", "medium")[0].upper()
+            due = f" (due {task['due']})" if task.get("due") else ""
+            lines.append(f"  [{marker}] #{num} [{pri}] {task['title']}{due}")
+        return f"Tasks ({len(filtered)}):\n" + "\n".join(lines)
+
+    def complete_task(self, task_number: int) -> str:
+        tasks = self.memory.get("tasks", [])
+        if not tasks:
+            return "No tasks exist."
+        idx = task_number - 1
+        if idx < 0 or idx >= len(tasks):
+            return f"Invalid task number. You have {len(tasks)} tasks."
+        tasks[idx]["status"] = "completed"
+        tasks[idx]["completed_at"] = datetime.now().isoformat()
+        self.save()
+        return f"Task #{task_number} completed: {tasks[idx]['title']}"
 
     def clear_all(self) -> str:
         self.memory = dict(DEFAULT_MEMORY)
