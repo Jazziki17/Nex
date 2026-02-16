@@ -5,11 +5,15 @@ Loaded on startup so Nex remembers the user.
 
 Smart cleanup: facts have TTL and access tracking. Frequently accessed facts
 survive longer. Stale facts are automatically purged on startup and every save.
+
+Sensitive data (facts, tasks) is encrypted at rest using Fernet symmetric encryption.
 """
 
+import base64
 import json
 import os
 import shutil
+import stat
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +25,7 @@ logger = setup_logger(__name__)
 
 MEMORY_DIR = Path.home() / ".nex" / "data"
 MEMORY_FILE = MEMORY_DIR / "memory.json"
+KEY_FILE = MEMORY_DIR / ".key"
 
 DEFAULT_MEMORY = {
     "user": {"name": None, "preferences": {}},
@@ -33,6 +38,35 @@ DEFAULT_MEMORY = {
 MAX_FACTS = 200
 DEFAULT_TTL_DAYS = 30
 
+# Fields that get encrypted at rest
+_ENCRYPTED_FIELDS = ("facts", "tasks")
+
+
+def _get_or_create_key() -> bytes:
+    """Load or generate the Fernet encryption key."""
+    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    if KEY_FILE.exists():
+        return KEY_FILE.read_bytes().strip()
+
+    from cryptography.fernet import Fernet
+    key = Fernet.generate_key()
+    KEY_FILE.write_bytes(key)
+    # chmod 600 — owner-only read/write
+    KEY_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    logger.info("Generated new encryption key")
+    return key
+
+
+def _get_fernet():
+    """Get a Fernet instance, or None if cryptography is unavailable."""
+    try:
+        from cryptography.fernet import Fernet
+        key = _get_or_create_key()
+        return Fernet(key)
+    except ImportError:
+        logger.warning("cryptography not installed — data will not be encrypted")
+        return None
+
 
 class MemoryManager:
     """Manages persistent memory for Nex."""
@@ -40,7 +74,26 @@ class MemoryManager:
     def __init__(self, event_bus: EventBus):
         self.event_bus = event_bus
         self.memory: dict = {}
+        self._fernet = _get_fernet()
         self._load()
+
+    def _encrypt_field(self, data) -> str:
+        """Encrypt a JSON-serializable value to a base64 string."""
+        if self._fernet is None:
+            return data  # No encryption available
+        raw = json.dumps(data, default=str).encode("utf-8")
+        return base64.b64encode(self._fernet.encrypt(raw)).decode("ascii")
+
+    def _decrypt_field(self, blob):
+        """Decrypt a base64-encoded encrypted string back to Python objects."""
+        if self._fernet is None or not isinstance(blob, str):
+            return blob  # Not encrypted or no encryption available
+        try:
+            raw = self._fernet.decrypt(base64.b64decode(blob))
+            return json.loads(raw.decode("utf-8"))
+        except Exception:
+            # Data might be unencrypted (first run after adding encryption)
+            return blob
 
     def _load(self):
         # Auto-migrate from old ~/.kai directory
@@ -52,7 +105,14 @@ class MemoryManager:
 
         if MEMORY_FILE.exists():
             try:
-                self.memory = json.loads(MEMORY_FILE.read_text(encoding="utf-8"))
+                raw = json.loads(MEMORY_FILE.read_text(encoding="utf-8"))
+
+                # Decrypt encrypted fields
+                for field in _ENCRYPTED_FIELDS:
+                    if field in raw and isinstance(raw[field], str):
+                        raw[field] = self._decrypt_field(raw[field])
+
+                self.memory = raw
                 self._migrate_facts()
                 removed = self._cleanup()
                 facts = self.memory.get("facts", [])
@@ -115,11 +175,18 @@ class MemoryManager:
         facts = self.memory.get("facts", [])
         if len(facts) > MAX_FACTS:
             self.memory["facts"] = facts[-MAX_FACTS:]
+
+        # Build output dict with encrypted sensitive fields
+        output = dict(self.memory)
+        for field in _ENCRYPTED_FIELDS:
+            if field in output:
+                output[field] = self._encrypt_field(output[field])
+
         # Atomic write: tmp file then rename
         try:
             fd, tmp_path = tempfile.mkstemp(dir=str(MEMORY_DIR), suffix=".json.tmp")
             with os.fdopen(fd, "w") as f:
-                json.dump(self.memory, f, indent=2, default=str)
+                json.dump(output, f, indent=2, default=str)
             os.replace(tmp_path, str(MEMORY_FILE))
         except Exception as e:
             logger.error(f"Failed to save memory: {e}")

@@ -2,6 +2,9 @@
 WebSocket handler — bridges EventBus events to connected clients.
 Clients connect to ws://localhost:8420/ws and receive real-time events.
 Clients can also send commands via WebSocket.
+
+Requires token authentication: clients must send {"type": "auth", "token": "..."}
+as their first message within 5 seconds.
 """
 
 import asyncio
@@ -15,8 +18,10 @@ logger = setup_logger(__name__)
 
 router = APIRouter()
 
-# Connected WebSocket clients
+# Connected (authenticated) WebSocket clients
 _clients: set[WebSocket] = set()
+
+AUTH_TIMEOUT = 5  # seconds to authenticate
 
 
 async def broadcast(event_type: str, data: dict):
@@ -52,6 +57,8 @@ def _install_event_bridge(event_bus):
         "settings.updated",
         "settings.voice_change",
         "mic.transcribed",
+        "system.locked",
+        "system.unlocked",
     ]
 
     for evt in event_types:
@@ -68,14 +75,43 @@ def _install_event_bridge(event_bus):
 _bridge_installed = False
 
 
+async def _authenticate(ws: WebSocket) -> bool:
+    """Wait for auth message within timeout. Returns True if authenticated."""
+    from nex.api.server import session_token
+
+    try:
+        raw = await asyncio.wait_for(ws.receive_text(), timeout=AUTH_TIMEOUT)
+        msg = json.loads(raw)
+        if msg.get("type") == "auth" and msg.get("token") == session_token:
+            return True
+        logger.warning("WebSocket auth failed: invalid token")
+        return False
+    except asyncio.TimeoutError:
+        logger.warning("WebSocket auth failed: timeout")
+        return False
+    except (json.JSONDecodeError, Exception) as e:
+        logger.warning(f"WebSocket auth failed: {e}")
+        return False
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     """WebSocket endpoint for real-time event streaming."""
     global _bridge_installed
 
     await ws.accept()
+
+    # Require authentication
+    if not await _authenticate(ws):
+        await ws.send_text(json.dumps({
+            "type": "error",
+            "data": {"message": "Authentication required. Send {type: 'auth', token: '...'} first."},
+        }))
+        await ws.close(code=4001, reason="Authentication failed")
+        return
+
     _clients.add(ws)
-    logger.info(f"WebSocket client connected ({len(_clients)} total)")
+    logger.info(f"WebSocket client authenticated ({len(_clients)} total)")
 
     # Install event bridge on first connection
     if not _bridge_installed:

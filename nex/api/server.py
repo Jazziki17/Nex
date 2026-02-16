@@ -5,12 +5,13 @@ Serves the orb UI as static files, provides REST endpoints for file ops,
 commands, and status, and bridges WebSocket for real-time events.
 """
 
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from nex.api.routes import commands, files, spreadsheets, status
@@ -28,12 +29,17 @@ STATIC_DIR = Path(__file__).parent.parent / "ui" / "static"
 # Shared engine instance — set during lifespan
 engine: NexEngine | None = None
 
+# Session token for WebSocket auth — generated on each startup
+session_token: str = ""
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start NexEngine on startup, shut down on exit."""
-    global engine
+    global engine, session_token
     engine = NexEngine()
+    session_token = secrets.token_hex(32)
+    logger.info("Session token generated for WebSocket auth")
 
     # Start engine (discovers and starts modules) without blocking
     import asyncio
@@ -138,10 +144,13 @@ def get_engine() -> NexEngine:
 
 app = FastAPI(title="Nex API", version="0.1.0", lifespan=lifespan)
 
-# CORS — allow Electron and mobile apps
+# CORS — restrict to localhost only
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8420",
+        "http://127.0.0.1:8420",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -154,6 +163,18 @@ app.include_router(commands.router, prefix="/api/commands")
 app.include_router(spreadsheets.router, prefix="/api/files")
 app.include_router(settings_router, prefix="/api/settings")
 app.include_router(ws_router)
+
+
+# ─── Auth token endpoint (localhost-only) ──────────────────
+
+@app.get("/api/auth/token")
+async def get_auth_token(request: Request):
+    """Return the session token for WebSocket auth. Localhost only."""
+    host = request.client.host if request.client else ""
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    return {"token": session_token}
+
 
 # Redirect bare paths to trailing slash so StaticFiles serves index.html
 @app.get("/ui")

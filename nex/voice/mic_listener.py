@@ -6,6 +6,7 @@ VAD, transcribes with mlx-whisper (Apple Silicon optimized), and publishes
 "system.command" so the existing CommandHandler processes it.
 
 Mutes during TTS playback to prevent feedback loops.
+Integrates voice authentication to block unauthorized speakers.
 """
 
 import asyncio
@@ -47,10 +48,28 @@ class MicListener:
         self._process_lock = asyncio.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
 
+        # Voice authentication
+        self._voice_auth = None
+        self._enrolling = False
+        self._enrollment_samples: list[np.ndarray] = []
+        self._enrollment_count = 3  # Number of samples needed
+
     async def start(self):
         """Start listening on the default microphone."""
         self._loop = asyncio.get_running_loop()
         self._running = True
+
+        # Initialize voice auth (lazy — encoder loads on first use)
+        try:
+            from nex.api.voice_auth import VoiceAuth
+            self._voice_auth = VoiceAuth()
+            if self._voice_auth.is_enrolled():
+                logger.info("Voice authentication active")
+            else:
+                logger.info("Voice authentication available (not enrolled)")
+        except ImportError:
+            logger.warning("resemblyzer not installed — voice auth disabled")
+            self._voice_auth = None
 
         # Subscribe to TTS events to mute mic during speech
         self.event_bus.subscribe("command.response", self._on_tts_start)
@@ -73,6 +92,12 @@ class MicListener:
             self._stream.close()
             self._stream = None
         logger.info("MicListener stopped.")
+
+    def start_enrollment(self):
+        """Begin voice enrollment — next N utterances become training samples."""
+        self._enrolling = True
+        self._enrollment_samples = []
+        logger.info("Voice enrollment started — collecting samples")
 
     def _audio_callback(self, indata: np.ndarray, frames: int, time_info, status):
         """
@@ -138,6 +163,44 @@ class MicListener:
                 audio = np.concatenate(audio_chunks, axis=0).flatten()
                 duration = len(audio) / SAMPLE_RATE
                 logger.info(f"Transcribing {duration:.1f}s of audio...")
+
+                # If enrolling, collect this sample instead of normal processing
+                if self._enrolling:
+                    self._enrollment_samples.append(audio.copy())
+                    remaining = self._enrollment_count - len(self._enrollment_samples)
+                    if remaining > 0:
+                        await self.event_bus.publish("command.response", {
+                            "text": f"Sample recorded. {remaining} more to go. Please say another phrase.",
+                            "command": "_enrollment",
+                        })
+                        return
+                    else:
+                        # Enrollment complete
+                        self._enrolling = False
+                        if self._voice_auth:
+                            result = self._voice_auth.enroll(self._enrollment_samples)
+                            self._enrollment_samples = []
+                            await self.event_bus.publish("command.response", {
+                                "text": result,
+                                "command": "_enrollment",
+                            })
+                        return
+
+                # Voice authentication check
+                if self._voice_auth and self._voice_auth.is_enrolled():
+                    is_match, confidence = self._voice_auth.verify(audio)
+                    if not is_match:
+                        logger.warning(f"Voice auth failed (confidence={confidence:.3f})")
+                        await self.event_bus.publish("command.response", {
+                            "text": "I don't recognise your voice. Please identify yourself.",
+                            "command": "_voice_auth_failed",
+                        })
+                        await self.event_bus.publish("mic.transcribed", {
+                            "text": "[unrecognised speaker]",
+                            "duration": round(duration, 1),
+                            "voice_auth": False,
+                        })
+                        return
 
                 # Run whisper in executor to avoid blocking the event loop
                 loop = asyncio.get_running_loop()

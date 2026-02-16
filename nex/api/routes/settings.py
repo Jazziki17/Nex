@@ -17,3 +17,13 @@ async def get_settings():
         user = engine._memory.memory.get("user", {})
         return {"voice": "Andrew", "user_name": user.get("name")}
     return {"voice": "Andrew", "user_name": None}
+
+
+@router.get("/voice-auth-status")
+async def voice_auth_status():
+    try:
+        from nex.api.voice_auth import VoiceAuth
+        va = VoiceAuth()
+        return {"enrolled": va.is_enrolled(), "available": True}
+    except ImportError:
+        return {"enrolled": False, "available": False}

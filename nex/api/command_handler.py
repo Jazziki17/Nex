@@ -8,6 +8,8 @@ import datetime
 import json
 import os
 import platform
+import time
+from collections import defaultdict
 from pathlib import Path
 
 import edge_tts
@@ -25,6 +27,13 @@ OLLAMA_URL = "http://localhost:11434"
 MODEL = "llama3.2"
 MAX_HISTORY = 20
 MAX_TOOL_ROUNDS = 5
+
+# Rate limiting
+RATE_LIMIT_MAX = 20       # commands per window
+RATE_LIMIT_WINDOW = 60    # seconds
+
+# Auto-lock
+AUTO_LOCK_TIMEOUT = 900   # 15 minutes in seconds
 
 SYSTEM_PROMPT = """You are Nex — a sophisticated personal AI assistant running locally on the user's Mac.
 You are modelled after JARVIS from Iron Man: razor-sharp intelligence wrapped in refined British-inflected politeness and understated dry wit. You treat the user as a respected colleague, not a customer — confident, never servile. Address the user by name when you know it.
@@ -212,6 +221,16 @@ TOOLS = [
             "source": {"type": "string", "description": "camera or file path"},
         }, "required": []},
     }},
+    {"type": "function", "function": {
+        "name": "enroll_voice",
+        "description": "Start voice authentication enrollment. The user will be asked to speak 3 phrases to create a voice profile.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "reset_voice_auth",
+        "description": "Reset voice authentication, deleting the stored voice profile.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
 ]
 
 
@@ -222,10 +241,42 @@ class CommandHandler:
         self.history: list[dict] = []
         self.tts_process: asyncio.subprocess.Process | None = None
 
+        # Rate limiting: source -> list of timestamps
+        self._rate_log: dict[str, list[float]] = defaultdict(list)
+
+        # Auto-lock
+        self._last_command_time: float = time.monotonic()
+        self._locked = False
+        self._lock_check_task: asyncio.Task | None = None
+
     async def start(self):
         self.event_bus.subscribe("system.command", self._on_command)
         self.event_bus.subscribe("system.ready", self._on_system_ready)
+        self._lock_check_task = asyncio.create_task(self._auto_lock_loop())
         logger.info("Command handler ready.")
+
+    async def _auto_lock_loop(self):
+        """Periodically check for inactivity and lock if needed."""
+        while True:
+            await asyncio.sleep(60)
+            if not self._locked:
+                elapsed = time.monotonic() - self._last_command_time
+                if elapsed >= AUTO_LOCK_TIMEOUT:
+                    self._locked = True
+                    logger.info("Auto-locked after inactivity")
+                    await self.event_bus.publish("system.locked", {})
+
+    def _check_rate_limit(self, source: str) -> bool:
+        """Returns True if the command should be allowed, False if rate limited."""
+        now = time.monotonic()
+        # Prune old entries
+        self._rate_log[source] = [
+            t for t in self._rate_log[source] if now - t < RATE_LIMIT_WINDOW
+        ]
+        if len(self._rate_log[source]) >= RATE_LIMIT_MAX:
+            return False
+        self._rate_log[source].append(now)
+        return True
 
     async def _on_system_ready(self, data: dict):
         """Deliver a proactive briefing when Nex starts up."""
@@ -311,6 +362,34 @@ class CommandHandler:
         command = data.get("command", "").strip()
         if not command:
             return
+
+        source = data.get("source", "unknown")
+
+        # Rate limiting
+        if not self._check_rate_limit(source):
+            logger.warning(f"Rate limited: {source}")
+            await self.event_bus.publish("command.response", {
+                "text": "Too many commands. Please slow down.",
+                "command": command,
+            })
+            return
+
+        # Auto-lock check: voice commands require re-verification when locked
+        if self._locked and source == "microphone":
+            logger.info("Command blocked — system is locked")
+            await self.event_bus.publish("command.response", {
+                "text": "I'm currently locked due to inactivity. Please speak again to verify your identity.",
+                "command": command,
+            })
+            return
+
+        # Unlock on any valid command
+        if self._locked:
+            self._locked = False
+            await self.event_bus.publish("system.unlocked", {})
+
+        self._last_command_time = time.monotonic()
+
         logger.info(f"Command received: {command}")
         try:
             response = await self._process_with_tools(command)
@@ -395,6 +474,8 @@ class CommandHandler:
                 case "identify_objects": return await self._tool_detect(args.get("source", "camera"))
                 case "classify_image": return await self._tool_classify(args.get("source", "camera"))
                 case "segment_scene": return await self._tool_segment(args.get("source", "camera"))
+                case "enroll_voice": return await self._tool_enroll_voice()
+                case "reset_voice_auth": return await self._tool_reset_voice_auth()
                 case _: return f"Unknown tool: {name}"
         except Exception as e:
             return f"Error: {e}"
@@ -600,6 +681,28 @@ class CommandHandler:
             return await segment_scene(source)
         except Exception as e:
             return f"Vision error: {e}"
+
+    async def _tool_enroll_voice(self) -> str:
+        """Trigger voice enrollment via MicListener."""
+        try:
+            from nex.api.server import engine
+            if engine and hasattr(engine, '_mic_listener') and engine._mic_listener:
+                engine._mic_listener.start_enrollment()
+                return "Voice enrollment started. Please speak 3 different phrases clearly. I'll confirm each one."
+            return "Microphone is not available. Cannot enroll voice."
+        except Exception as e:
+            return f"Error starting enrollment: {e}"
+
+    async def _tool_reset_voice_auth(self) -> str:
+        """Reset voice authentication profile."""
+        try:
+            from nex.api.voice_auth import VoiceAuth
+            va = VoiceAuth()
+            return va.reset()
+        except ImportError:
+            return "Voice authentication module not available."
+        except Exception as e:
+            return f"Error resetting voice auth: {e}"
 
     def _fallback(self, text: str) -> str:
         lower = text.lower()

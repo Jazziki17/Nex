@@ -275,11 +275,24 @@
     let ws = null;
     let wsConnected = false;
 
-    function connectWebSocket() {
+    async function connectWebSocket() {
+        // Fetch session token for WebSocket auth
+        let token = '';
+        try {
+            const resp = await fetch(`${location.protocol}//${location.hostname || 'localhost'}:${location.port || 8420}/api/auth/token`);
+            const data = await resp.json();
+            token = data.token || '';
+        } catch {
+            setTimeout(connectWebSocket, 3000);
+            return;
+        }
+
         const wsUrl = `ws://${location.hostname || 'localhost'}:${location.port || 8420}/ws`;
         try { ws = new WebSocket(wsUrl); } catch { return; }
 
         ws.onopen = () => {
+            // Send auth token as first message
+            ws.send(JSON.stringify({ type: 'auth', token: token }));
             wsConnected = true;
             window._nexWs = ws;
             statusEl.textContent = 'CONNECTED';

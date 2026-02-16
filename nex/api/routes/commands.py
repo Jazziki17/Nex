@@ -1,6 +1,7 @@
-"""Command execution route — sandboxed with an allowlist."""
+"""Command execution route — sandboxed with an allowlist and injection protection."""
 
 import asyncio
+import re
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -21,6 +22,24 @@ ALLOWED_COMMANDS = {
     "open",  # macOS
 }
 
+# Patterns that bypass the allowlist (code execution, shell injection)
+BLOCKED_PATTERNS = [
+    r"python3?\s+-[cm]",       # python -c "..." or python -m
+    r"\|",                      # pipe chains
+    r";",                       # command chaining
+    r"&&",                      # conditional chaining
+    r"\|\|",                    # OR chaining
+    r"`",                       # backtick subshell
+    r"\$\(",                    # $() subshell
+    r">\s*\(",                  # process substitution
+    r"<\(",                     # process substitution
+    r"\beval\b",                # eval
+    r"\bexec\b",                # exec
+    r"\bsource\b",             # source
+]
+
+_BLOCKED_RE = re.compile("|".join(BLOCKED_PATTERNS))
+
 
 def _is_allowed(cmd: str) -> bool:
     """Check if the base command is in the allowlist."""
@@ -29,6 +48,11 @@ def _is_allowed(cmd: str) -> bool:
         return False
     base = parts[0].split("/")[-1]  # Handle full paths like /usr/bin/ls
     return base in ALLOWED_COMMANDS
+
+
+def _has_injection(cmd: str) -> bool:
+    """Check for shell injection / bypass patterns."""
+    return bool(_BLOCKED_RE.search(cmd))
 
 
 class CommandRequest(BaseModel):
@@ -43,6 +67,12 @@ async def run_command(req: CommandRequest):
         raise HTTPException(
             status_code=403,
             detail=f"Command not in allowlist. Allowed: {sorted(ALLOWED_COMMANDS)}",
+        )
+
+    if _has_injection(req.command):
+        raise HTTPException(
+            status_code=403,
+            detail="Command contains blocked patterns (pipes, subshells, or code execution flags).",
         )
 
     timeout = min(req.timeout, 60.0)  # Cap at 60s

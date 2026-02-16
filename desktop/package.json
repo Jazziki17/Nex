@@ -6,10 +6,29 @@
   "scripts": {
     "build": "tsc",
     "start": "npm run build && electron .",
-    "dev": "tsc && electron ."
+    "dev": "tsc && electron .",
+    "dist": "npm run build && electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.nex.assistant",
+    "productName": "Nex",
+    "mac": {
+      "icon": "resources/icon.icns",
+      "category": "public.app-category.productivity",
+      "target": ["dmg"]
+    },
+    "dmg": {
+      "title": "Nex",
+      "icon": "resources/icon.icns"
+    },
+    "files": [
+      "dist/**/*",
+      "resources/**/*"
+    ]
   },
   "devDependencies": {
     "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
     "typescript": "^5.5.0"
   }
 }
