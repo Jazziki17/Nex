@@ -78,6 +78,9 @@ dev = [
     "httpx>=0.27.0",
 ]
 
+[project.scripts]
+nex = "nex.cli.__main__:run"
+
 # ─── Tool Configuration ─────────────────────────────────────
 
 [tool.pytest.ini_options]

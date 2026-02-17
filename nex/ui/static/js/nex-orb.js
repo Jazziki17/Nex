@@ -260,8 +260,8 @@
         window.dispatchEvent(new CustomEvent('nex:viewchange', { detail: { view } }));
     };
 
-    // Nav button clicks
-    document.querySelectorAll('.nav-btn').forEach(btn => {
+    // Nav button clicks (only buttons with data-view, skip fullscreen/history)
+    document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
         btn.addEventListener('click', () => switchView(btn.dataset.view));
     });
 
@@ -457,7 +457,9 @@
             commandInput.focus();
             commandVisible = true;
         }
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' && commandVisible) {
+            e.preventDefault();
+            e.stopPropagation();
             commandBar.classList.remove('visible');
             commandInput.blur();
             commandInput.value = '';
@@ -466,17 +468,25 @@
     });
 
     commandInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && commandInput.value.trim()) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
             const text = commandInput.value.trim();
-            commandInput.value = '';
-            commandBar.classList.remove('visible');
-            commandVisible = false;
-            showTranscript('> ' + text);
-            window.dispatchEvent(new CustomEvent('nex:user.command', { detail: { text } }));
-            if (ws && wsConnected) {
-                ws.send(JSON.stringify({ type: 'command', command: text }));
+            if (text) {
+                commandInput.value = '';
+                commandBar.classList.remove('visible');
+                commandVisible = false;
+                showTranscript('> ' + text);
+                window.dispatchEvent(new CustomEvent('nex:user.command', { detail: { text } }));
+                if (ws && wsConnected) {
+                    ws.send(JSON.stringify({ type: 'command', command: text }));
+                }
+                startSpeaking();
+            } else {
+                // Empty Enter closes the command bar
+                commandBar.classList.remove('visible');
+                commandInput.blur();
+                commandVisible = false;
             }
-            startSpeaking();
         }
     });
 
@@ -494,23 +504,35 @@
     const fsShrinkIcon = document.getElementById('fs-shrink-icon');
     let isFullscreen = false;
 
+    function updateFullscreenUI(fs) {
+        isFullscreen = fs;
+        document.body.classList.toggle('fullscreen', fs);
+        if (fsExpandIcon) fsExpandIcon.style.display = fs ? 'none' : '';
+        if (fsShrinkIcon) fsShrinkIcon.style.display = fs ? '' : 'none';
+    }
+
     if (fsBtn) {
         fsBtn.addEventListener('click', () => {
+            // Prefer Electron IPC, fallback to Web Fullscreen API
             if (window.nexAPI && window.nexAPI.toggleFullscreen) {
                 window.nexAPI.toggleFullscreen();
+            } else if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                document.documentElement.requestFullscreen().catch(() => {});
             }
         });
     }
 
-    // Listen for fullscreen state changes from Electron
+    // Listen for fullscreen state changes from Electron IPC
     if (window.nexAPI && window.nexAPI.onFullscreenChange) {
-        window.nexAPI.onFullscreenChange((fs) => {
-            isFullscreen = fs;
-            document.body.classList.toggle('fullscreen', fs);
-            if (fsExpandIcon) fsExpandIcon.style.display = fs ? 'none' : '';
-            if (fsShrinkIcon) fsShrinkIcon.style.display = fs ? '' : 'none';
-        });
+        window.nexAPI.onFullscreenChange(updateFullscreenUI);
     }
+
+    // Listen for Web Fullscreen API changes (fallback)
+    document.addEventListener('fullscreenchange', () => {
+        updateFullscreenUI(!!document.fullscreenElement);
+    });
 
     // ─── Animation Loop ─────────────────────────────────
 

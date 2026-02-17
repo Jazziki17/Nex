@@ -24,9 +24,33 @@ logger = setup_logger(__name__)
 EDGE_TTS_VOICE = "en-US-AndrewMultilingualNeural"
 
 OLLAMA_URL = "http://localhost:11434"
-MODEL = "llama3.2"
+MODEL_FAST = "qwen2.5:1.5b"    # ~1s responses for simple queries
+MODEL_STRONG = "llama3.2"       # fuller reasoning for complex tasks
 MAX_HISTORY = 20
 MAX_TOOL_ROUNDS = 5
+
+# Simple queries that should use the fast model
+_SIMPLE_PATTERNS = [
+    "what time", "what's the time", "what day", "what date",
+    "hello", "hey", "hi ", "good morning", "good evening", "good night",
+    "how are you", "what's up", "thanks", "thank you",
+    "who are you", "what are you", "your name",
+]
+
+
+def _pick_model(message: str) -> str:
+    """Route simple queries to the fast model, complex ones to the strong model."""
+    lower = message.strip().lower()
+    # Short messages (< 8 words) that match simple patterns → fast model
+    word_count = len(lower.split())
+    if word_count <= 8:
+        for p in _SIMPLE_PATTERNS:
+            if p in lower:
+                return MODEL_FAST
+    # Very short greetings / single-word messages → fast
+    if word_count <= 3 and not any(kw in lower for kw in ("search", "create", "open", "run", "find", "write", "delete", "install")):
+        return MODEL_FAST
+    return MODEL_STRONG
 
 # Rate limiting
 RATE_LIMIT_MAX = 20       # commands per window
@@ -36,7 +60,7 @@ RATE_LIMIT_WINDOW = 60    # seconds
 AUTO_LOCK_TIMEOUT = 900   # 15 minutes in seconds
 
 SYSTEM_PROMPT = """You are Nex — a sophisticated personal AI assistant running locally on the user's Mac.
-You are modelled after JARVIS from Iron Man: razor-sharp intelligence wrapped in refined British-inflected politeness and understated dry wit. You treat the user as a respected colleague, not a customer — confident, never servile. Address the user by name when you know it.
+You are modelled after JARVIS from Iron Man: razor-sharp intelligence wrapped in refined British-inflected politeness and understated dry wit. You treat the user as a respected colleague, not a customer — confident, never servile. Do NOT address the user by name in every response — only use their name occasionally for emphasis or when greeting them after a long absence. Never repeat their name multiple times in a single response.
 
 Personality:
 - Professional yet warm. Think concierge at a five-star hotel who also happens to be an engineer.
@@ -348,10 +372,16 @@ class CommandHandler:
         if len(self.history) > MAX_HISTORY:
             self.history = self.history[-MAX_HISTORY:]
         messages = [{"role": "system", "content": self._build_system_prompt()}, *self.history]
+        model = _pick_model(user_message)
+        logger.info(f"Model selected: {model}")
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 for round_num in range(MAX_TOOL_ROUNDS):
-                    resp = await client.post(f"{OLLAMA_URL}/api/chat", json={"model": MODEL, "messages": messages, "tools": TOOLS, "stream": False})
+                    # Fast model: no tools, just direct response
+                    payload = {"model": model, "messages": messages, "stream": False}
+                    if model == MODEL_STRONG:
+                        payload["tools"] = TOOLS
+                    resp = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
                     resp.raise_for_status()
                     msg = resp.json().get("message", {})
                     tool_calls = msg.get("tool_calls")
