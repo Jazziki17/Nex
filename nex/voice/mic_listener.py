@@ -5,11 +5,16 @@ Captures audio from the default microphone, detects speech using energy-based
 VAD, transcribes with mlx-whisper (Apple Silicon optimized), and publishes
 "system.command" so the existing CommandHandler processes it.
 
+Wake word gated: only activates when the utterance starts with "Nex"
+(e.g. "Nex go check the weather", "Nex what time is it").
+All other speech is silently ignored — no Whisper, no LLM, no delay.
+
 Mutes during TTS playback to prevent feedback loops.
 Integrates voice authentication to block unauthorized speakers.
 """
 
 import asyncio
+import re
 import time
 
 import numpy as np
@@ -33,6 +38,24 @@ MAX_SPEECH_DURATION = 30   # seconds cap to prevent runaway recording
 
 # Whisper model (small, fast on Apple Silicon)
 WHISPER_MODEL = "mlx-community/whisper-base-mlx"
+
+# Wake word — utterance must start with one of these to activate
+# Regex strips the wake prefix so the LLM gets just the command
+_WAKE_RE = re.compile(
+    r"^\s*(?:"
+    r"(?:hey[\s,.:!]*)?(?:nex|next|necks?|nix|knex|lex)[\s,.:!]*(?:go[\s,.:!]*)?"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _extract_command(text: str) -> str | None:
+    """If text starts with a wake phrase, return the command part. Otherwise None."""
+    m = _WAKE_RE.match(text)
+    if m:
+        command = text[m.end():].strip()
+        return command if command else None
+    return None
 
 
 class MicListener:
@@ -82,7 +105,7 @@ class MicListener:
             callback=self._audio_callback,
         )
         self._stream.start()
-        logger.info(f"MicListener started (device: {sd.query_devices(kind='input')['name']})")
+        logger.info(f"MicListener started — say 'Nex go ...' to activate (device: {sd.query_devices(kind='input')['name']})")
 
     async def stop(self):
         """Stop listening."""
@@ -156,7 +179,7 @@ class MicListener:
             )
 
     async def _transcribe(self, audio_chunks: list[np.ndarray]):
-        """Transcribe captured audio and publish as a command."""
+        """Transcribe captured audio, check for wake word, then publish command."""
         async with self._process_lock:
             try:
                 # Concatenate audio chunks into a single array
@@ -164,7 +187,7 @@ class MicListener:
                 duration = len(audio) / SAMPLE_RATE
                 logger.info(f"Transcribing {duration:.1f}s of audio...")
 
-                # If enrolling, collect this sample instead of normal processing
+                # If enrolling, collect this sample (bypass wake word check)
                 if self._enrolling:
                     self._enrollment_samples.append(audio.copy())
                     remaining = self._enrollment_count - len(self._enrollment_samples)
@@ -175,7 +198,6 @@ class MicListener:
                         })
                         return
                     else:
-                        # Enrollment complete
                         self._enrolling = False
                         if self._voice_auth:
                             result = self._voice_auth.enroll(self._enrollment_samples)
@@ -186,7 +208,27 @@ class MicListener:
                             })
                         return
 
-                # Voice authentication check
+                # Run whisper in executor to avoid blocking the event loop
+                loop = asyncio.get_running_loop()
+                result = await loop.run_in_executor(None, self._run_whisper, audio)
+
+                text = result.get("text", "").strip()
+                if not text:
+                    logger.debug("Whisper returned empty transcription")
+                    return
+
+                logger.info(f"Transcribed: {text}")
+
+                # ── Wake word gate ────────────────────────────
+                command = _extract_command(text)
+                if command is None:
+                    # No wake word — ignore silently
+                    logger.debug(f"No wake word, ignoring: {text}")
+                    return
+
+                logger.info(f"Wake word detected — command: {command}")
+
+                # Voice authentication check (only after wake word matches)
                 if self._voice_auth and self._voice_auth.is_enrolled():
                     is_match, confidence = self._voice_auth.verify(audio)
                     if not is_match:
@@ -202,26 +244,15 @@ class MicListener:
                         })
                         return
 
-                # Run whisper in executor to avoid blocking the event loop
-                loop = asyncio.get_running_loop()
-                result = await loop.run_in_executor(None, self._run_whisper, audio)
-
-                text = result.get("text", "").strip()
-                if not text:
-                    logger.debug("Whisper returned empty transcription")
-                    return
-
-                logger.info(f"Transcribed: {text}")
-
                 # Publish to UI so it can show what was heard
                 await self.event_bus.publish("mic.transcribed", {
-                    "text": text,
+                    "text": command,
                     "duration": round(duration, 1),
                 })
 
-                # Feed into existing command pipeline
+                # Feed into command pipeline
                 await self.event_bus.publish("system.command", {
-                    "command": text,
+                    "command": command,
                     "source": "microphone",
                 })
 

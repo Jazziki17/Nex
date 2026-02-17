@@ -106,17 +106,11 @@
 
     // ─── Init on settings view open ─────────────────────
 
-    const observer = new MutationObserver(() => {
-        const settingsView = document.getElementById('settings-view');
-        if (settingsView && settingsView.classList.contains('active')) {
+    window.addEventListener('nex:viewchange', (e) => {
+        if (e.detail.view === 'settings') {
             loadSettings();
         }
     });
-
-    const settingsView = document.getElementById('settings-view');
-    if (settingsView) {
-        observer.observe(settingsView, { attributes: true, attributeFilter: ['class'] });
-    }
 
     // Initial load
     loadSettings();

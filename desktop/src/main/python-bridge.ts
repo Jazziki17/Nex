@@ -1,25 +1,28 @@
 /**
  * Python Bridge — Spawns and monitors the Nex API server.
  * Handles health checks, auto-restart, and graceful shutdown.
+ * Works in both dev mode (npm run dev) and packaged mode (.app).
  */
 
-import { ChildProcess, spawn } from 'child_process'
+import { ChildProcess, spawn, execSync } from 'child_process'
 import { join } from 'path'
+import { existsSync } from 'fs'
+import { app } from 'electron'
 import http from 'http'
 
 const PORT = 8420
 const HEALTH_URL = `http://localhost:${PORT}/api/status`
 const HEALTH_INTERVAL = 5000
 const MAX_RESTARTS = 5
-const STARTUP_TIMEOUT = 15000
+const STARTUP_TIMEOUT = 30000
 
 export class PythonBridge {
   private process: ChildProcess | null = null
   private healthTimer: NodeJS.Timeout | null = null
   private restartCount = 0
   private stopping = false
-
   private externalServer = false
+  private _serverReachable = false
 
   async start(): Promise<void> {
     this.stopping = false
@@ -29,28 +32,30 @@ export class PythonBridge {
     if (alreadyUp) {
       console.log('[PythonBridge] Server already running — attaching to existing instance')
       this.externalServer = true
+      this._serverReachable = true
       this.startHealthCheck()
       return
     }
 
     this.spawn()
     await this.waitForReady()
+    this._serverReachable = true
     this.startHealthCheck()
   }
 
   async stop(): Promise<void> {
     this.stopping = true
+    this._serverReachable = false
     this.stopHealthCheck()
 
     if (this.externalServer) {
-      // Don't kill an externally managed server
+      this.externalServer = false
       return
     }
 
     if (this.process) {
       this.process.kill('SIGTERM')
 
-      // Wait up to 5s for graceful shutdown
       await new Promise<void>((resolve) => {
         const timeout = setTimeout(() => {
           if (this.process) {
@@ -82,19 +87,63 @@ export class PythonBridge {
   }
 
   get isRunning(): boolean {
-    return this.process !== null && !this.process.killed
+    return this._serverReachable
+  }
+
+  private getProjectRoot(): string {
+    if (app.isPackaged) {
+      // Packaged .app — project lives at ~/Nex
+      const homeProject = join(process.env.HOME || '/Users/jazz', 'Nex')
+      if (existsSync(join(homeProject, 'nex', '__init__.py'))) {
+        return homeProject
+      }
+      // Fallback: check if .app is still inside the project tree
+      const fromExe = join(app.getPath('exe'), '..', '..', '..', '..', '..', '..')
+      if (existsSync(join(fromExe, 'nex', '__init__.py'))) {
+        return fromExe
+      }
+      return homeProject
+    }
+
+    // Dev mode — desktop/ is inside the project
+    return join(__dirname, '..', '..', '..')
+  }
+
+  private findPython(): string {
+    // Try common locations for python3 with our deps
+    const candidates = [
+      join(process.env.HOME || '', 'anaconda3', 'bin', 'python3'),
+      '/usr/local/bin/python3',
+      '/opt/homebrew/bin/python3',
+      'python3',
+    ]
+
+    for (const p of candidates) {
+      try {
+        execSync(`${p} -c "import fastapi"`, { stdio: 'pipe' })
+        return p
+      } catch {
+        continue
+      }
+    }
+
+    return 'python3'
   }
 
   private spawn(): void {
-    console.log('[PythonBridge] Starting python -m nex.api ...')
+    const projectRoot = this.getProjectRoot()
+    const python = this.findPython()
 
-    // Find the project root (parent of desktop/)
-    const projectRoot = join(__dirname, '..', '..', '..')
+    console.log(`[PythonBridge] Starting ${python} -m nex.api in ${projectRoot}`)
 
-    this.process = spawn('python3', ['-m', 'nex.api'], {
+    this.process = spawn(python, ['-m', 'nex.api'], {
       cwd: projectRoot,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        PYTHONPATH: projectRoot,
+        PYTHONUNBUFFERED: '1',
+      },
     })
 
     this.process.stdout?.on('data', (data: Buffer) => {
@@ -108,6 +157,7 @@ export class PythonBridge {
     this.process.on('exit', (code) => {
       console.log(`[PythonBridge] Process exited with code ${code}`)
       this.process = null
+      this._serverReachable = false
 
       if (!this.stopping && this.restartCount < MAX_RESTARTS) {
         this.restartCount++
@@ -139,7 +189,7 @@ export class PythonBridge {
           .catch(() => setTimeout(check, 500))
       }
 
-      setTimeout(check, 1000) // Give server a moment to start
+      setTimeout(check, 1000)
     })
   }
 
@@ -158,6 +208,7 @@ export class PythonBridge {
   private startHealthCheck(): void {
     this.healthTimer = setInterval(async () => {
       const ok = await this.healthCheck()
+      this._serverReachable = ok
       if (!ok && !this.stopping) {
         console.warn('[PythonBridge] Health check failed, server may be down')
       }

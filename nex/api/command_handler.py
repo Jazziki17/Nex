@@ -281,6 +281,10 @@ class CommandHandler:
     async def _on_system_ready(self, data: dict):
         """Deliver a proactive briefing when Nex starts up."""
         await asyncio.sleep(2)  # Let UI connect first
+        asyncio.create_task(self._deliver_briefing())
+
+    async def _deliver_briefing(self):
+        """Build and deliver the startup briefing without blocking."""
         try:
             briefing = await self._build_briefing()
             if briefing:
@@ -329,9 +333,9 @@ class CommandHandler:
         except Exception:
             pass
 
-        # Weather (quick, non-blocking attempt)
+        # Weather (quick attempt with short timeout)
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get("https://wttr.in/?format=%C+%t", headers={"User-Agent": "Nex/0.1"})
                 if resp.status_code == 200:
                     weather = resp.text.strip()

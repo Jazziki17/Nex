@@ -16,7 +16,7 @@
     let targetAmp = 0;
     let isListening = true;
 
-    // Current view: 'orb' | 'dashboard' | 'settings'
+    // Current view: 'orb' | 'dashboard' | 'services' | 'logs' | 'settings'
     let currentView = 'orb';
 
     function getBaseRadius() {
@@ -240,10 +240,14 @@
     window.switchView = function(view) {
         currentView = view;
         const dashView = document.getElementById('dashboard-view');
+        const servView = document.getElementById('services-view');
+        const logsView = document.getElementById('logs-view');
         const settView = document.getElementById('settings-view');
 
         // Toggle overlays
         dashView.classList.toggle('active', view === 'dashboard');
+        servView.classList.toggle('active', view === 'services');
+        logsView.classList.toggle('active', view === 'logs');
         settView.classList.toggle('active', view === 'settings');
         canvas.classList.toggle('dimmed', view !== 'orb');
 
@@ -251,6 +255,9 @@
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === view);
         });
+
+        // Dispatch event for sub-modules
+        window.dispatchEvent(new CustomEvent('nex:viewchange', { detail: { view } }));
     };
 
     // Nav button clicks
@@ -259,7 +266,7 @@
     });
 
     // Tab key cycles views
-    const views = ['orb', 'dashboard', 'settings'];
+    const views = ['orb', 'dashboard', 'services', 'logs', 'settings'];
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Tab' && !commandInput.matches(':focus')) {
             e.preventDefault();
@@ -323,7 +330,7 @@
     function handleServerEvent(msg) {
         const { type, data } = msg;
 
-        // Dispatch CustomEvent for dashboard/settings JS to listen
+        // Dispatch CustomEvent for dashboard/settings/services/logs JS to listen
         window.dispatchEvent(new CustomEvent('nex:' + type, { detail: data }));
 
         switch (type) {
@@ -415,6 +422,7 @@
             commandBar.classList.remove('visible');
             commandVisible = false;
             showTranscript('> ' + text);
+            window.dispatchEvent(new CustomEvent('nex:user.command', { detail: { text } }));
             if (ws && wsConnected) {
                 ws.send(JSON.stringify({ type: 'command', command: text }));
             }

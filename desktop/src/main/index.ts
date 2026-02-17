@@ -10,12 +10,6 @@ import { PythonBridge } from './python-bridge'
 
 let pythonBridge: PythonBridge | null = null
 
-// Auto-launch at login (hidden)
-app.setLoginItemSettings({
-  openAtLogin: true,
-  openAsHidden: true,
-})
-
 app.whenReady().then(async () => {
   pythonBridge = new PythonBridge()
   await pythonBridge.start()

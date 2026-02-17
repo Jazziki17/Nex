@@ -10,13 +10,19 @@
 <body>
     <canvas id="canvas"></canvas>
 
-    <!-- Nav Toggle (top-right) -->
+    <!-- Nav Toggle (bottom-center pill) -->
     <nav class="nav-toggle" id="nav-toggle">
         <button class="nav-btn active" data-view="orb" title="Orb">
             <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
         <button class="nav-btn" data-view="dashboard" title="Dashboard">
             <svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="3" width="7" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="11" width="7" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="14" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+        <button class="nav-btn" data-view="services" title="Services">
+            <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+        <button class="nav-btn" data-view="logs" title="Logs">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         </button>
         <button class="nav-btn" data-view="settings" title="Settings">
             <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -41,31 +47,60 @@
                 <div class="stat-label">CPU</div>
                 <div class="stat-value" id="stat-cpu">0%</div>
                 <div class="stat-bar"><div class="stat-bar-fill" id="bar-cpu"></div></div>
-                <div class="stat-sub" id="sub-cpu">— cores</div>
+                <div class="stat-sub" id="sub-cpu">&mdash; cores</div>
             </div>
             <div class="stat-card" id="card-memory">
                 <div class="stat-label">MEMORY</div>
                 <div class="stat-value" id="stat-memory">0%</div>
                 <div class="stat-bar"><div class="stat-bar-fill" id="bar-memory"></div></div>
-                <div class="stat-sub" id="sub-memory">— / — GB</div>
+                <div class="stat-sub" id="sub-memory">&mdash; / &mdash; GB</div>
             </div>
             <div class="stat-card" id="card-disk">
                 <div class="stat-label">DISK</div>
                 <div class="stat-value" id="stat-disk">0%</div>
                 <div class="stat-bar"><div class="stat-bar-fill" id="bar-disk"></div></div>
-                <div class="stat-sub" id="sub-disk">— / — GB</div>
+                <div class="stat-sub" id="sub-disk">&mdash; / &mdash; GB</div>
             </div>
             <div class="stat-card" id="card-battery">
                 <div class="stat-label">BATTERY</div>
-                <div class="stat-value" id="stat-battery">—</div>
+                <div class="stat-value" id="stat-battery">&mdash;</div>
                 <div class="stat-bar"><div class="stat-bar-fill" id="bar-battery"></div></div>
-                <div class="stat-sub" id="sub-battery">—</div>
+                <div class="stat-sub" id="sub-battery">&mdash;</div>
             </div>
             <div class="stat-card wide" id="card-network">
                 <div class="stat-label">NETWORK</div>
-                <div class="stat-value" id="stat-network">— / —</div>
+                <div class="stat-value" id="stat-network">&mdash; / &mdash;</div>
                 <div class="stat-sub" id="sub-network">sent / received</div>
             </div>
+        </div>
+        <div class="transcript-panel">
+            <div class="panel-label">RECENT</div>
+            <div class="transcript-list" id="dashboard-transcript"></div>
+        </div>
+    </div>
+
+    <!-- Services View -->
+    <div class="view-overlay" id="services-view">
+        <div class="view-title">SERVICES</div>
+        <div class="services-list" id="services-list">
+            <div class="services-loading">Loading modules...</div>
+        </div>
+    </div>
+
+    <!-- Logs View -->
+    <div class="view-overlay" id="logs-view">
+        <div class="logs-header">
+            <div class="view-title">LOGS</div>
+            <select id="log-filter" class="log-filter-select">
+                <option value="all">All</option>
+                <option value="system.command">Commands</option>
+                <option value="tool.executing">Tools</option>
+                <option value="system.ready">System</option>
+                <option value="command.response">Responses</option>
+            </select>
+        </div>
+        <div class="logs-scroll" id="logs-scroll">
+            <div id="logs-body"></div>
         </div>
     </div>
 
@@ -106,6 +141,8 @@
 
     <script src="js/nex-orb.js"></script>
     <script src="js/nex-dashboard.js"></script>
+    <script src="js/nex-services.js"></script>
+    <script src="js/nex-logs.js"></script>
     <script src="js/nex-settings.js"></script>
 </body>
 </html>
