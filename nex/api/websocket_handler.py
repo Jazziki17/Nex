@@ -53,6 +53,7 @@ def _install_event_bridge(event_bus):
         "file.read_response",
         "system.stats",
         "tool.executing",
+        "tool.output",
         "tool.completed",
         "settings.updated",
         "settings.voice_change",

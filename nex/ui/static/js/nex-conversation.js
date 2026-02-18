@@ -242,13 +242,39 @@
         activeThinking = addEntry('thinking', 'Running ' + name + '...', []);
     });
 
+    // ─── JSON Filter ────────────────────────────────────
+
+    function filterJsonArtifacts(text) {
+        if (!text) return text;
+        const trimmed = text.trim();
+        // If entire response is a JSON tool call, replace with generic message
+        if ((trimmed.startsWith('{') || trimmed.startsWith('[')) &&
+            (trimmed.endsWith('}') || trimmed.endsWith(']'))) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (parsed && typeof parsed === 'object' &&
+                    ('name' in parsed || 'function' in parsed || 'parameters' in parsed || 'tool_call' in parsed)) {
+                    return 'Processing your request...';
+                }
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0] && 'name' in parsed[0]) {
+                    return 'Processing your request...';
+                }
+            } catch (e) { /* not JSON, keep as-is */ }
+        }
+        // Strip inline JSON tool call blobs from within text
+        return text.replace(/\{"(?:name|function|tool_call)"\s*:\s*"[^"]*"[^}]*\}/g, '').trim() || text;
+    }
+
     // Command response — the main response handler
     window.addEventListener('nex:command.response', (e) => {
-        const text = e.detail.text || '';
+        let text = e.detail.text || '';
         const command = e.detail.command || '';
 
         // Skip internal/system commands
         if (command.startsWith('_')) return;
+
+        // Filter any raw JSON tool call artifacts
+        text = filterJsonArtifacts(text);
 
         const elapsed = commandStartTime ? Date.now() - commandStartTime : null;
         commandStartTime = null;

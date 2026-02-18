@@ -1,5 +1,8 @@
 """Settings routes — preferences."""
 
+import shutil
+from pathlib import Path
+
 from fastapi import APIRouter
 
 router = APIRouter(tags=["settings"])
@@ -27,3 +30,15 @@ async def voice_auth_status():
         return {"enrolled": va.is_enrolled(), "available": True}
     except ImportError:
         return {"enrolled": False, "available": False}
+
+
+@router.post("/clear-cache")
+async def clear_cache():
+    """Clear __pycache__ directories under the Nex runtime folder."""
+    nex_root = Path.home() / "Nex"
+    removed = 0
+    for cache_dir in nex_root.rglob("__pycache__"):
+        if cache_dir.is_dir():
+            shutil.rmtree(cache_dir, ignore_errors=True)
+            removed += 1
+    return {"cleared": removed, "message": f"Removed {removed} cache directories"}

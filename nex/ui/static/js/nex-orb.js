@@ -61,8 +61,27 @@
         for (const p of particles) {
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+            // Mix cyan into particles for Matrix feel
+            const cyanMix = 0.3 + Math.sin(time * 0.5 + p.pulseOffset) * 0.2;
+            ctx.fillStyle = `rgba(${Math.round(255 * (1 - cyanMix))}, ${Math.round(255 - 40 * cyanMix)}, 255, ${p.alpha})`;
             ctx.fill();
+        }
+        // Draw connection lines between nearby particles
+        ctx.lineWidth = 0.3;
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = dx * dx + dy * dy;
+                if (dist < 6000) {
+                    const alpha = (1 - dist / 6000) * 0.08;
+                    ctx.strokeStyle = `rgba(0, 212, 255, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.stroke();
+                }
+            }
         }
     }
 
@@ -87,7 +106,11 @@
             ctx.rotate(time * ring.rot);
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+            // Cyan tint for inner rings, white for outer
+            const cyanAmount = ring.r < 1.6 ? 0.7 : 0.2;
+            const r = Math.round(255 * (1 - cyanAmount));
+            const g = Math.round(255 - 20 * cyanAmount);
+            ctx.strokeStyle = `rgba(${r}, ${g}, 255, ${alpha})`;
             ctx.lineWidth = ring.w;
             if (ring.dash.length) ctx.setLineDash(ring.dash);
             ctx.stroke();
@@ -157,38 +180,60 @@
         const base = getBaseRadius();
         const breathe = 1 + voiceAmp * 0.06;
         const radius = base * breathe;
+        const pulse = Math.sin(time * 1.5) * 0.5 + 0.5; // 0-1 breathing
 
+        // Outer cyan glow (large, soft)
+        const outerGlow = ctx.createRadialGradient(cx, cy, radius * 0.3, cx, cy, radius * 1.6);
+        outerGlow.addColorStop(0, `rgba(0, 212, 255, ${(0.04 + voiceAmp * 0.06) * (0.7 + pulse * 0.3)})`);
+        outerGlow.addColorStop(0.4, `rgba(0, 180, 255, ${(0.02 + voiceAmp * 0.03) * (0.7 + pulse * 0.3)})`);
+        outerGlow.addColorStop(1, 'rgba(0, 100, 200, 0)');
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 1.6, 0, Math.PI * 2);
+        ctx.fillStyle = outerGlow;
+        ctx.fill();
+
+        // Inner glow (warm white-cyan)
         const glow = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius * 1.1);
-        glow.addColorStop(0, `rgba(200, 210, 220, ${0.03 + voiceAmp * 0.04})`);
-        glow.addColorStop(0.5, `rgba(180, 190, 200, ${0.015 + voiceAmp * 0.02})`);
-        glow.addColorStop(1, 'rgba(150, 160, 170, 0)');
+        glow.addColorStop(0, `rgba(200, 230, 255, ${0.04 + voiceAmp * 0.05})`);
+        glow.addColorStop(0.5, `rgba(0, 180, 240, ${0.02 + voiceAmp * 0.03})`);
+        glow.addColorStop(1, 'rgba(0, 100, 200, 0)');
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 1.1, 0, Math.PI * 2);
         ctx.fillStyle = glow;
         ctx.fill();
 
+        // Core dark fill
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 0.65, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(8, 8, 12, ${0.6 + voiceAmp * 0.2})`;
+        ctx.fillStyle = `rgba(6, 8, 14, ${0.7 + voiceAmp * 0.2})`;
         ctx.fill();
 
+        // Core ring — cyan tint
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 0.65, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.25 + voiceAmp * 0.3})`;
+        const ringAlpha = 0.3 + voiceAmp * 0.35 + pulse * 0.1;
+        ctx.strokeStyle = `rgba(0, 212, 255, ${ringAlpha})`;
         ctx.lineWidth = 1.5 + voiceAmp * 0.5;
+        ctx.shadowColor = 'rgba(0, 212, 255, 0.4)';
+        ctx.shadowBlur = 12 + voiceAmp * 8;
         ctx.stroke();
+        ctx.shadowBlur = 0;
 
+        // NEX text with cyan glow
         const fontSize = base * 0.28;
         ctx.font = `300 ${fontSize}px 'Inter', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.6 + voiceAmp * 0.3})`;
+        ctx.shadowColor = 'rgba(0, 212, 255, 0.5)';
+        ctx.shadowBlur = 8 + voiceAmp * 6;
+        ctx.fillStyle = `rgba(220, 240, 255, ${0.65 + voiceAmp * 0.3})`;
         const letters = 'NEX';
         const spacing = fontSize * 0.55;
         const startX = cx - ((letters.length - 1) * spacing) / 2;
         for (let i = 0; i < letters.length; i++) {
             ctx.fillText(letters[i], startX + i * spacing, cy + 2);
         }
+        ctx.shadowBlur = 0;
     }
 
     // ─── Arc Segments ───────────────────────────────────
@@ -211,7 +256,10 @@
             ctx.rotate(time * arc.speed);
             ctx.beginPath();
             ctx.arc(0, 0, radius, arc.start, arc.end);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${arc.a + voiceAmp * arc.a * 0.5})`;
+            const arcAlpha = arc.a + voiceAmp * arc.a * 0.5;
+            ctx.strokeStyle = arc.r < 1.5
+                ? `rgba(0, 212, 255, ${arcAlpha})`
+                : `rgba(200, 230, 255, ${arcAlpha})`;
             ctx.lineWidth = arc.w;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -223,8 +271,9 @@
 
     function resize() {
         const dpr = window.devicePixelRatio || 1;
-        W = window.innerWidth;
-        H = window.innerHeight;
+        const rect = canvas.getBoundingClientRect();
+        W = rect.width;
+        H = rect.height;
         canvas.width = W * dpr;
         canvas.height = H * dpr;
         canvas.style.width = W + 'px';
@@ -253,8 +302,8 @@
         settView.classList.toggle('active', view === 'settings');
         canvas.classList.toggle('dimmed', view !== 'orb');
 
-        // Update nav buttons
-        document.querySelectorAll('.nav-btn').forEach(btn => {
+        // Update sidebar buttons
+        document.querySelectorAll('.sidebar-btn[data-view]').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === view);
         });
 
@@ -262,8 +311,8 @@
         window.dispatchEvent(new CustomEvent('nex:viewchange', { detail: { view } }));
     };
 
-    // Nav button clicks (only buttons with data-view, skip fullscreen/history)
-    document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
+    // Sidebar button clicks (only buttons with data-view, skip fullscreen/history/workspace)
+    document.querySelectorAll('.sidebar-btn[data-view]').forEach(btn => {
         btn.addEventListener('click', () => switchView(btn.dataset.view));
     });
 
@@ -348,6 +397,7 @@
                 stopSpeaking();
                 if (!data.command || !data.command.startsWith('_')) {
                     showTranscript(data.text || '');
+                    if (window.NexSounds) window.NexSounds.play('messageReceive');
                     // Brief "RESPONDING" state before going back to LISTENING
                     statusEl.textContent = 'RESPONDING';
                     statusEl.classList.add('active');
@@ -364,11 +414,13 @@
                 statusEl.textContent = (data.name || 'TOOL').toUpperCase().replace(/_/g, ' ');
                 statusEl.classList.add('tool-active');
                 targetAmp = 0.3;
+                if (window.NexSounds) window.NexSounds.play('toolStart');
                 break;
 
             case 'tool.completed':
                 statusEl.textContent = 'THINKING';
                 statusEl.classList.remove('tool-active');
+                if (window.NexSounds) window.NexSounds.play('toolDone');
                 break;
 
             case 'system.ready':
@@ -482,6 +534,7 @@
                 if (ws && wsConnected) {
                     ws.send(JSON.stringify({ type: 'command', command: text }));
                 }
+                if (window.NexSounds) window.NexSounds.play('messageSend');
                 startSpeaking();
             } else {
                 // Empty Enter closes the command bar
@@ -552,10 +605,68 @@
         requestAnimationFrame(animate);
     }
 
+    // ─── Periodic Glitch ────────────────────────────────
+
+    setInterval(() => {
+        canvas.classList.add('glitch');
+        if (window.NexSounds) window.NexSounds.play('glitch');
+        setTimeout(() => canvas.classList.remove('glitch'), 200);
+    }, 25000 + Math.random() * 15000);
+
+    // ─── Background Matrix Rain ─────────────────────────
+
+    function initBgMatrix() {
+        const bgCanvas = document.getElementById('bg-matrix-canvas');
+        if (!bgCanvas) return;
+        const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = window.innerWidth;
+        bgCanvas.height = window.innerHeight;
+
+        const chars = 'NEX01アイウエオカキ';
+        const fontSize = 12;
+        const columns = Math.floor(bgCanvas.width / fontSize);
+        const drops = [];
+        for (let i = 0; i < columns; i++) drops[i] = Math.random() * -50;
+
+        function drawBgRain() {
+            bgCtx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            bgCtx.fillStyle = 'rgba(0, 255, 65, 0.6)';
+            bgCtx.font = `${fontSize}px monospace`;
+
+            for (let i = 0; i < drops.length; i++) {
+                const char = chars[Math.floor(Math.random() * chars.length)];
+                bgCtx.fillText(char, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > bgCanvas.height && Math.random() > 0.99) {
+                    drops[i] = 0;
+                }
+                drops[i] += 0.3; // Slow speed
+            }
+            requestAnimationFrame(drawBgRain);
+        }
+        drawBgRain();
+
+        window.addEventListener('resize', () => {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+        });
+    }
+
+    // ─── Scan Line ──────────────────────────────────────
+
+    function addScanLine() {
+        const scanLine = document.createElement('div');
+        scanLine.className = 'orb-scan-line';
+        document.body.appendChild(scanLine);
+    }
+
     // ─── Init ───────────────────────────────────────────
 
     window.addEventListener('resize', resize);
+    window.addEventListener('nex:workspace.toggle', () => setTimeout(resize, 320));
     resize();
     connectWebSocket();
     animate();
+    initBgMatrix();
+    addScanLine();
 })();

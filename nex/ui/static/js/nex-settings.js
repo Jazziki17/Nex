@@ -104,6 +104,28 @@
         }
     });
 
+    // ─── Clear Cache ──────────────────────────────────────
+
+    const clearCacheBtn = document.getElementById('clear-cache-btn');
+    const cacheStatus = document.getElementById('cache-status');
+
+    if (clearCacheBtn) {
+        clearCacheBtn.addEventListener('click', async () => {
+            clearCacheBtn.disabled = true;
+            if (cacheStatus) cacheStatus.textContent = 'Clearing...';
+            try {
+                const base = `${location.protocol}//${location.hostname || 'localhost'}:${location.port || 8420}`;
+                const resp = await fetch(base + '/api/settings/clear-cache', { method: 'POST' });
+                const data = await resp.json();
+                if (cacheStatus) cacheStatus.textContent = data.message || 'Done';
+            } catch (e) {
+                if (cacheStatus) cacheStatus.textContent = 'Failed';
+            }
+            clearCacheBtn.disabled = false;
+            setTimeout(() => { if (cacheStatus) cacheStatus.textContent = ''; }, 4000);
+        });
+    }
+
     // ─── Init on settings view open ─────────────────────
 
     window.addEventListener('nex:viewchange', (e) => {

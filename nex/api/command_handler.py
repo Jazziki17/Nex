@@ -387,6 +387,8 @@ class CommandHandler:
                     tool_calls = msg.get("tool_calls")
                     if not tool_calls:
                         reply = msg.get("content", "").strip() or "Done."
+                        # Filter raw JSON tool calls that leaked into text
+                        reply = self._filter_json_artifacts(reply)
                         self.history.append({"role": "assistant", "content": reply})
                         return reply
                     logger.info(f"Tool round {round_num + 1}: {len(tool_calls)} call(s)")
@@ -401,6 +403,13 @@ class CommandHandler:
                         logger.info(f"  Tool: {name}")
                         await self.event_bus.publish("tool.executing", {"name": name, "round": round_num + 1})
                         result = await self._execute_tool(name, args)
+                        # Publish tool output for workspace pane
+                        sanitized_args = {k: (str(v)[:200] if v else "") for k, v in args.items()}
+                        await self.event_bus.publish("tool.output", {
+                            "name": name,
+                            "output": result[:3000],
+                            "args": sanitized_args,
+                        })
                         await self.event_bus.publish("tool.completed", {"name": name, "success": not result.startswith("Error")})
                         messages.append({"role": "tool", "content": result})
                 return "I completed the actions."
@@ -673,6 +682,29 @@ class CommandHandler:
             return "Voice authentication module not available."
         except Exception as e:
             return f"Error resetting voice auth: {e}"
+
+    @staticmethod
+    def _filter_json_artifacts(reply: str) -> str:
+        """Strip raw JSON tool-call blobs that Ollama sometimes leaks into text."""
+        stripped = reply.strip()
+        # If entire reply is a JSON object/array with tool-call keys, discard it
+        if stripped.startswith(("{", "[")) and stripped.endswith(("}", "]")):
+            try:
+                parsed = json.loads(stripped)
+                # Detect tool-call shaped objects
+                if isinstance(parsed, dict) and ("name" in parsed or "function" in parsed or "parameters" in parsed):
+                    return "Done."
+                if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict) and "name" in parsed[0]:
+                    return "Done."
+            except json.JSONDecodeError:
+                pass
+        # If reply contains an embedded JSON tool call block alongside text, strip the JSON
+        import re
+        cleaned = re.sub(
+            r'\{"(?:name|function|tool_call)":\s*"[^"]*"[^}]*\}',
+            '', reply
+        ).strip()
+        return cleaned if cleaned else reply
 
     def _fallback(self, text: str) -> str:
         lower = text.lower()
